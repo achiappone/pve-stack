@@ -1,0 +1,55 @@
+#!/bin/bash
+# Pull pve-stack from GitHub and install it to the host and the containers.
+#
+# Runs on the HOST, not in a container: installing into containers needs
+# `pct push` / `pct exec`, and the PVE API has no file-push endpoint for LXC,
+# so no container can do this job even with write permissions.
+#
+# Detached when triggered from the dashboard, because the last thing it does is
+# restart the exporter that received the request. Holding the connection open
+# would kill the response mid-flight and the click would look like a failure.
+#
+#   pve-deploy [branch]     default: main
+set -uo pipefail
+LOG=/var/log/pve-deploy.log
+exec >>"$LOG" 2>&1
+
+REPO=/opt/pve-stack
+BRANCH="${1:-main}"
+echo "=== $(date -Is) deploy start (branch $BRANCH) ==="
+
+git -C "$REPO" fetch --depth 1 origin "$BRANCH" || { echo "FAILED: fetch"; exit 1; }
+OLD=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo none)
+git -C "$REPO" reset --hard "origin/$BRANCH" >/dev/null || { echo "FAILED: reset"; exit 1; }
+NEW=$(git -C "$REPO" rev-parse --short HEAD)
+echo "commit $OLD -> $NEW"
+git -C "$REPO" --no-pager log --oneline -1
+
+# Containers first. The exporter goes last because restarting it ends whatever
+# connection asked for this deploy.
+if [ -f "$REPO/ops/opsdash.py" ]; then
+  pct push 102 "$REPO/ops/opsdash.py" /opt/opsdash.py --perms 755 \
+    && pct push 102 "$REPO/systemd/pve-ops.service" /etc/systemd/system/pve-ops.service \
+    && pct exec 102 -- systemctl daemon-reload \
+    && pct exec 102 -- systemctl restart pve-ops \
+    && echo "ok: 102 pve-ops" || echo "FAILED: 102 pve-ops"
+fi
+
+if [ -f "$REPO/camera/camrelay.py" ]; then
+  pct push 101 "$REPO/camera/camrelay.py" /opt/camrelay.py --perms 755 \
+    && pct push 101 "$REPO/systemd/camrelay.service" /etc/systemd/system/camrelay.service \
+    && pct exec 101 -- systemctl daemon-reload \
+    && pct exec 101 -- systemctl restart camrelay \
+    && echo "ok: 101 camrelay" || echo "FAILED: 101 camrelay"
+fi
+
+for f in k2-deploy k2-set-smtp pve-deploy; do
+  [ -f "$REPO/deploy/$f" ] && install -m755 "$REPO/deploy/$f" "/usr/local/sbin/$f" && echo "ok: /usr/local/sbin/$f"
+done
+[ -f "$REPO/deploy/pve-fstrim.cron" ] && install -m644 "$REPO/deploy/pve-fstrim.cron" /etc/cron.d/pve-fstrim && echo "ok: fstrim cron"
+
+install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"
+install -m644 "$REPO/systemd/pve-exporter.service" /etc/systemd/system/pve-exporter.service
+systemctl daemon-reload
+echo "=== $(date -Is) deploy done at $NEW - restarting exporter ==="
+systemctl restart pve-exporter
