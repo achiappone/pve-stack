@@ -30,6 +30,17 @@ NEW=$(git -C "$REPO" rev-parse --short HEAD)
 echo "commit $OLD -> $NEW"
 git -C "$REPO" --no-pager log --oneline -1
 
+# This script deploys itself. Without re-exec, a run uses the OLD logic while
+# installing the NEW script, so any change to what gets deployed only takes
+# effect on the *next* invocation - which has twice produced a half-applied
+# state (a node systemd unit installed with no dist/ to run, and an ops block
+# silently skipped after a directory rename). Re-exec so one click lands fully.
+if [ "${PVE_DEPLOY_REEXEC:-}" != "1" ] && ! cmp -s "$REPO/deploy/pve-deploy" /usr/local/sbin/pve-deploy; then
+  install -m755 "$REPO/deploy/pve-deploy" /usr/local/sbin/pve-deploy
+  echo "pve-deploy changed - re-executing the new one"
+  PVE_DEPLOY_REEXEC=1 exec /usr/local/sbin/pve-deploy "$BRANCH"
+fi
+
 # Containers first. The exporter goes last because restarting it ends whatever
 # connection asked for this deploy.
 # ops dashboard: TypeScript, compiled. dist/ is committed so the container
