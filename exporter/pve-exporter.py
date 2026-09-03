@@ -7,7 +7,7 @@ this is reachable only from containers attached to it and never from the LAN.
 Everything here is a read. There are no actions, so the worst a caller can do
 is learn the host's temperature.
 """
-import glob, json, os, re, subprocess
+import glob, json, os, re, subprocess, threading, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 BIND = os.environ.get("EXPORTER_BIND", "10.10.10.1")
@@ -145,6 +145,43 @@ def deploy_state():
     return {"lines": lines[-12:], "running": running}
 
 
+# Unit states are refreshed on a background thread, not inside the request.
+# `pct exec` into a wedged container blocks - which has happened repeatedly on
+# this box - and the dashboard polls this endpoint every 5 seconds. A stale
+# reading is fine; a hung metrics endpoint is not.
+WATCH_UNITS = {
+    "host": ["pve-exporter", "pve-ops-none"],
+    "101": ["k2-dashboard", "camrelay", "cloudflared"],
+    "102": ["pve-ops", "cloudflared"],
+}
+UNIT_CACHE = {}
+
+
+def refresh_units():
+    while True:
+        snap = {}
+        for u in WATCH_UNITS["host"]:
+            if u.endswith("-none"):
+                continue
+            try:
+                r = subprocess.run(["systemctl", "is-active", u],
+                                   capture_output=True, text=True, timeout=8)
+                snap[f"host/{u}"] = r.stdout.strip() or "unknown"
+            except Exception:
+                snap[f"host/{u}"] = "unknown"
+        for ct in ("101", "102"):
+            for u in WATCH_UNITS[ct]:
+                try:
+                    r = subprocess.run(["pct", "exec", ct, "--", "systemctl", "is-active", u],
+                                       capture_output=True, text=True, timeout=10)
+                    snap[f"{ct}/{u}"] = r.stdout.strip() or "unknown"
+                except Exception:
+                    snap[f"{ct}/{u}"] = "unreachable"
+        UNIT_CACHE.clear()
+        UNIT_CACHE.update(snap)
+        time.sleep(20)
+
+
 def cpu():
     g = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "?")
     la = read("/proc/loadavg", "").split()[:3]
@@ -280,7 +317,8 @@ class H(BaseHTTPRequestHandler):
             return
         body = json.dumps({"hwmon": hwmon(), "volumes": volumes(),
                            "network": network(), "cpu": cpu(),
-                           "power": power(), "deploy": deploy_state()}).encode()
+                           "power": power(), "deploy": deploy_state(),
+                           "units": dict(UNIT_CACHE)}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -289,4 +327,5 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    threading.Thread(target=refresh_units, daemon=True).start()
     HTTPServer((BIND, PORT), H).serve_forever()
