@@ -16,7 +16,14 @@ function jsonRequest(url, opts = {}) {
             port: u.port || (isHttps ? 443 : 80),
             path: u.pathname + u.search,
             method: opts.method ?? "GET",
-            headers: opts.headers ?? {},
+            // Content-Length is mandatory here, not optional. Without it node uses
+            // chunked transfer-encoding, and the exporter reads exactly
+            // Content-Length bytes - so it saw an empty body and every action came
+            // back as "unknown action ''".
+            headers: {
+                ...(opts.headers ?? {}),
+                ...(opts.body ? { "Content-Length": String(Buffer.byteLength(opts.body)) } : {}),
+            },
             ...(isHttps && opts.insecure ? { rejectUnauthorized: false } : {}),
         }, (res) => {
             const chunks = [];
