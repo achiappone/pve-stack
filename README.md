@@ -8,7 +8,9 @@ laptop that has already powered itself off unexpectedly once.
 
 ## Layout
 
-    ops/opsdash.py          Dev-Ops dashboard          container 102, ops.anthonychiappone.com
+    ops/                    Dev-Ops dashboard (TS)     container 102, ops.anthonychiappone.com
+                            src/ is the source, dist/ is committed - the container
+                            needs only a node runtime, there are no runtime deps
     exporter/               host metrics + actions     runs on the HOST, bound to vmbr1
     camera/camrelay.py      WebRTC -> MJPEG relay      container 101
     deploy/                 deploy + maintenance       k2-deploy, k2-set-smtp, fstrim cron

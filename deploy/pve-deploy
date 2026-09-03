@@ -35,10 +35,10 @@ git -C "$REPO" --no-pager log --oneline -1
 # ops dashboard: TypeScript, compiled. dist/ is committed so the container
 # needs only a node runtime - the server has zero runtime dependencies, so
 # there is no npm install to do on the box.
-if [ -d "$REPO/ops-ts/dist" ]; then
+if [ -d "$REPO/ops/dist" ]; then
   pct exec 102 -- mkdir -p /opt/pve-ops/dist
   ok=1
-  for f in "$REPO"/ops-ts/dist/*.js; do
+  for f in "$REPO"/ops/dist/*.js; do
     pct push 102 "$f" "/opt/pve-ops/dist/$(basename "$f")" --perms 644 || ok=0
   done
   pct push 102 "$REPO/systemd/pve-ops.service" /etc/systemd/system/pve-ops.service || ok=0
