@@ -1,0 +1,35 @@
+{
+  "name": "pve-stack",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Proxmox host + container stack for pve-code1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx dev/run.ts",
+    "build": "npm --prefix ops run build",
+    "typecheck": "npm --prefix ops run typecheck",
+    "status": "tsx dev/run.ts status",
+    "health": "tsx dev/run.ts health",
+    "logs:ops": "tsx dev/run.ts logs:ops",
+    "logs:camera": "tsx dev/run.ts logs:camera",
+    "logs:printer": "tsx dev/run.ts logs:printer",
+    "logs:exporter": "tsx dev/run.ts logs:exporter",
+    "logs:deploy": "tsx dev/run.ts logs:deploy",
+    "metrics": "tsx dev/run.ts metrics",
+    "deploy": "tsx dev/run.ts deploy",
+    "trim": "tsx dev/run.ts trim",
+    "watch": "tsx dev/run.ts watch",
+    "shell:host": "tsx dev/run.ts shell:host",
+    "shell:ops": "tsx dev/run.ts shell:ops",
+    "shell:printer": "tsx dev/run.ts shell:printer"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "yaml": "^2.6.1"
+  }
+}

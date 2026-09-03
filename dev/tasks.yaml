@@ -1,0 +1,95 @@
+# Developer tasks for pve-stack. Run from the WebStorm terminal:
+#
+#   npm run dev            list every task
+#   npm run dev status     one of them
+#   npm run dev logs:ops
+#
+# Everything runs over the `proxmox` ssh alias, so these work on the office LAN
+# today. Off-LAN needs SSH published through the Cloudflare tunnel behind
+# Access - see README.
+
+host: proxmox
+
+tasks:
+  status:
+    desc: every service across the host and both containers
+    run: |
+      printf '%-16s %s\n' 'HOST' "$(uptime -p)"
+      for s in pve-exporter; do printf '  %-14s %s\n' "$s" "$(systemctl is-active $s)"; done
+      for ct in 101 102; do
+        echo "CT $ct:"
+        pct exec $ct -- bash -c 'for s in $(systemctl list-units --type=service --state=running --no-legend | awk "{print \$1}" | grep -E "pve-ops|camrelay|cloudflared|k2-dashboard"); do printf "  %-18s %s\n" "$s" "$(systemctl is-active $s)"; done'
+      done
+
+  health:
+    desc: the numbers that have actually broken things here
+    run: |
+      echo "-- thin allocation (98% wedged a container twice) --"
+      lvs --noheadings -o lv_name,data_percent 2>/dev/null | grep -E 'vm-|data ' | sed 's/^/  /'
+      echo "-- vmbr0 uplink (dongle drops out of the bridge) --"
+      echo "  ports: $(ls /sys/class/net/vmbr0/brif/ | tr '\n' ' ')"
+      echo "-- temps / fans --"
+      echo "  fan1 $(cat /sys/class/hwmon/hwmon6/fan1_input 2>/dev/null)rpm  fan2 $(cat /sys/class/hwmon/hwmon6/fan2_input 2>/dev/null)rpm"
+      echo "  governor: $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
+
+  logs:ops:
+    desc: ops dashboard (container 102)
+    run: pct exec 102 -- journalctl -u pve-ops -n 60 --no-pager
+
+  logs:camera:
+    desc: camera relay (container 101)
+    run: pct exec 101 -- journalctl -u camrelay -n 60 --no-pager
+
+  logs:printer:
+    desc: k2 dashboard (container 101)
+    run: pct exec 101 -- journalctl -u k2-dashboard -n 60 --no-pager
+
+  logs:exporter:
+    desc: host metrics exporter
+    run: journalctl -u pve-exporter -n 60 --no-pager
+
+  logs:deploy:
+    desc: last deploy run
+    run: tail -40 /var/log/pve-deploy.log
+
+  metrics:
+    desc: raw exporter payload, pretty printed
+    run: pct exec 102 -- python3 -c "import json,urllib.request;print(json.dumps(json.load(urllib.request.urlopen('http://10.10.10.1:9101/metrics',timeout=10)),indent=1))"
+
+  deploy:
+    desc: pull from GitHub and install to host + containers
+    run: /usr/local/sbin/pve-deploy main; sleep 4; tail -12 /var/log/pve-deploy.log
+
+  trim:
+    desc: reclaim thin allocation on every container
+    run: |
+      for ct in 100 101 102; do echo "CT $ct:"; pct fstrim $ct 2>&1 | sed 's/^/  /'; done
+      lvs --noheadings -o lv_name,data_percent | grep 'vm-' | sed 's/^/  /'
+
+  watch:
+    desc: refresh the key numbers every 5s until you ctrl-c
+    tty: true
+    run: |
+      while true; do
+        clear
+        date '+%H:%M:%S'
+        uptime
+        lvs --noheadings -o lv_name,data_percent 2>/dev/null | grep 'vm-'
+        pct list
+        sleep 5
+      done
+
+  shell:host:
+    desc: interactive shell on the Proxmox host
+    tty: true
+    run: bash -l
+
+  shell:ops:
+    desc: interactive shell in container 102
+    tty: true
+    run: pct enter 102
+
+  shell:printer:
+    desc: interactive shell in container 101
+    tty: true
+    run: pct enter 101
