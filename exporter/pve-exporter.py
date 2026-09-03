@@ -7,7 +7,7 @@ this is reachable only from containers attached to it and never from the LAN.
 Everything here is a read. There are no actions, so the worst a caller can do
 is learn the host's temperature.
 """
-import glob, json, os, subprocess
+import glob, json, os, re, subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 BIND = os.environ.get("EXPORTER_BIND", "10.10.10.1")
@@ -133,6 +133,18 @@ def power():
     return out
 
 
+def deploy_state():
+    """Last lines of the deploy log, so the dashboard can show progress without
+    a second endpoint. Append-only and small."""
+    try:
+        lines = open("/var/log/pve-deploy.log").read().strip().splitlines()
+    except Exception:
+        return {"lines": [], "running": False}
+    running = (any("deploy start" in l for l in lines[-40:])
+               and not any("deploy done" in l or "FAILED: fetch" in l for l in lines[-12:]))
+    return {"lines": lines[-12:], "running": running}
+
+
 def cpu():
     g = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "?")
     la = read("/proc/loadavg", "").split()[:3]
@@ -181,6 +193,22 @@ def do_action(body):
                "ct_start":  ["pct", "start", ct],
                "ct_stop":   ["pct", "stop", ct]}[act]
         return run(cmd, timeout=300)
+
+    if act == "deploy":
+        branch = str(body.get("branch", "main"))
+        # Must start alphanumeric and contain no "..": a leading dash would let
+        # a branch name become a git option (--upload-pack=...), and ".." is
+        # traversal. An earlier version allowed both.
+        if (not re.match(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,79}$", branch)
+                or ".." in branch):
+            return {"ok": False, "err": f"bad branch name {branch!r}"}
+        # Detached: pve-deploy restarts this very process at the end, so the
+        # response has to be sent before that happens.
+        subprocess.Popen(["setsid", "/usr/local/sbin/pve-deploy", branch],
+                         start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL)
+        return {"ok": True, "out": f"deploy started on {branch}"}
 
     if act == "host_reboot":
         # Requires an explicit confirmation string in the body. Every other
@@ -248,7 +276,7 @@ class H(BaseHTTPRequestHandler):
             return
         body = json.dumps({"hwmon": hwmon(), "volumes": volumes(),
                            "network": network(), "cpu": cpu(),
-                           "power": power()}).encode()
+                           "power": power(), "deploy": deploy_state()}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
