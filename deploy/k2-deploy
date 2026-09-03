@@ -1,0 +1,34 @@
+#!/bin/bash
+# Deploy the published code and restart.
+#
+# Pull-based on purpose: this host sits behind NAT with no inbound route, which
+# is the same reason it reaches the internet through a tunnel. No CI runner can
+# push to it, so the container fetches for itself.
+#
+# reset --hard, not pull: local edits are discarded deliberately, so what runs
+# is always a named commit rather than a hand-copied file nobody can identify.
+#
+#   k2-deploy            deploy origin/main
+#   k2-deploy somebranch deploy that branch instead
+set -euo pipefail
+REPO=/opt/k2plus-dashboard
+BRANCH="${1:-main}"
+
+cd "$REPO"
+OLD=$(git rev-parse --short HEAD 2>/dev/null || echo none)
+git fetch --depth 1 origin "$BRANCH"
+git reset --hard "origin/$BRANCH" >/dev/null
+NEW=$(git rev-parse --short HEAD)
+
+if [ "$OLD" = "$NEW" ]; then
+  echo "already at $NEW ($BRANCH) - restarting anyway"
+else
+  echo "$OLD -> $NEW ($BRANCH)"
+fi
+git --no-pager log --oneline -1
+
+systemctl restart k2-dashboard
+sleep 3
+S=$(systemctl is-active k2-dashboard)
+echo "k2-dashboard: $S"
+[ "$S" = active ] || { echo "FAILED - last log:"; journalctl -u k2-dashboard -n 15 --no-pager; exit 1; }

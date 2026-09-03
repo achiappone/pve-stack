@@ -1,0 +1,18 @@
+[Unit]
+Description=Proxmox ops dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/pve-ops.env
+ExecStart=/usr/bin/python3 /opt/opsdash.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

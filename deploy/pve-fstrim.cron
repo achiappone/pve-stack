@@ -1,0 +1,5 @@
+# LVM-thin does not reclaim freed blocks on its own. Container 101 runs a
+# headless Chromium whose cache churn allocates fresh blocks continuously - it
+# reached 98% allocated on a 32G volume whose filesystem held only 2.7G, and
+# wedged the container twice. Nightly trim keeps allocation near actual usage.
+17 4 * * * root /usr/sbin/pct fstrim 101 >/dev/null 2>&1

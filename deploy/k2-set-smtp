@@ -1,0 +1,26 @@
+#!/bin/bash
+# Set the Gmail app password for the K2 dashboard.
+# Reads on the Proxmox host (which has a TTY) and pipes the value into the
+# container over stdin - `pct exec` does not allocate a TTY, so `read -s` inside
+# the container silently reads nothing. The value never appears in argv, in the
+# process table, or in shell history.
+set -u
+read -rsp "Gmail app password: " P; echo
+P="${P// /}"                 # Google shows app passwords in groups of four
+N=${#P}
+if [ "$N" -eq 0 ]; then
+  echo "nothing entered - aborting, nothing changed"; exit 1
+fi
+if [ "$N" -ne 16 ]; then
+  echo "warning: Google app passwords are 16 characters, you gave $N"
+fi
+printf '%s' "$P" | pct exec 101 -- bash -c '
+  read -r X
+  sed -i "/^K2_SMTP_PASS=/d" /etc/k2-dashboard.env
+  printf "K2_SMTP_PASS=%s\n" "$X" >> /etc/k2-dashboard.env
+  chmod 600 /etc/k2-dashboard.env
+  systemctl restart k2-dashboard
+  sleep 3
+  echo "stored ${#X} chars; service $(systemctl is-active k2-dashboard)"
+'
+unset P

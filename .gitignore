@@ -1,0 +1,6 @@
+# Secrets live in env files on the boxes, never here:
+#   /etc/pve-ops.env       PVE API token, dashboard login
+#   /etc/k2-dashboard.env  control token, SMTP password, printer host
+*.env
+.idea/
+__pycache__/

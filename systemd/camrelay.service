@@ -1,0 +1,16 @@
+[Unit]
+Description=K2 camera relay (WebRTC -> MJPEG)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/k2-dashboard.env
+ExecStart=/opt/camrelay-venv/bin/python /opt/camrelay.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
