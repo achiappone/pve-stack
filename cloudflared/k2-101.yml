@@ -1,0 +1,9 @@
+tunnel: 44e1e447-3813-405e-b1bf-4b7eae9ac49d
+credentials-file: /etc/cloudflared/44e1e447-3813-405e-b1bf-4b7eae9ac49d.json
+
+# One rule: the dashboard proxies /camera/* to the MJPEG relay itself, so the
+# page is same-origin and the tunnel does not need path routing.
+ingress:
+  - hostname: k2.anthonychiappone.com
+    service: http://localhost:8770
+  - service: http_status:404

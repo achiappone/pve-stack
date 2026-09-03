@@ -24,7 +24,12 @@
     "watch": "tsx dev/run.ts watch",
     "shell:host": "tsx dev/run.ts shell:host",
     "shell:ops": "tsx dev/run.ts shell:ops",
-    "shell:printer": "tsx dev/run.ts shell:printer"
+    "shell:printer": "tsx dev/run.ts shell:printer",
+    "remote": "PVE_SSH_HOST=pve-remote tsx dev/run.ts",
+    "remote:health": "PVE_SSH_HOST=pve-remote tsx dev/run.ts health",
+    "remote:status": "PVE_SSH_HOST=pve-remote tsx dev/run.ts status",
+    "remote:deploy": "PVE_SSH_HOST=pve-remote tsx dev/run.ts deploy",
+    "remote:shell": "PVE_SSH_HOST=pve-remote tsx dev/run.ts shell:host"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

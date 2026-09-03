@@ -1,0 +1,18 @@
+tunnel: 9c320e89-1beb-4267-98e1-95b8f07d0383
+credentials-file: /etc/cloudflared/9c320e89-1beb-4267-98e1-95b8f07d0383.json
+
+# pve-ops binds 127.0.0.1 inside this container, so the tunnel is the only path
+# to it. Separate container and separate tunnel from the printer dashboard on
+# purpose: when 101 wedges, this is what you use to see why.
+#
+# pve-ssh.* reaches the HOST, not this container - it is what lets the
+# `npm run dev` tasks work from outside the office. Password auth is disabled
+# on that host, and this must also be gated by Cloudflare Access or it is an
+# open SSH endpoint on a hypervisor.
+# (ssh.anthonychiappone.com was already taken by an unrelated record.)
+ingress:
+  - hostname: ops.anthonychiappone.com
+    service: http://localhost:8780
+  - hostname: pve-ssh.anthonychiappone.com
+    service: ssh://10.20.1.43:22
+  - service: http_status:404

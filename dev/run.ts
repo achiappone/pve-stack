@@ -21,7 +21,7 @@ const name = process.argv[2];
 
 if (!name || name === "--list") {
   const width = Math.max(...Object.keys(spec.tasks).map((k) => k.length));
-  console.log(`\npve-stack tasks  (host: ${spec.host})\n`);
+  console.log(`\npve-stack tasks  (host: ${process.env["PVE_SSH_HOST"] ?? spec.host})\n`);
   for (const [k, t] of Object.entries(spec.tasks)) {
     console.log(`  ${k.padEnd(width)}  ${t.desc ?? ""}`);
   }
@@ -35,8 +35,14 @@ if (!task) {
   process.exit(1);
 }
 
+// PVE_SSH_HOST switches between the two routes to the same machine:
+//   proxmox     direct to 10.20.1.43, office LAN only
+//   pve-remote  through the Cloudflare tunnel, works anywhere
+// Default comes from tasks.yaml so the common case needs no env var.
+const host = process.env["PVE_SSH_HOST"] ?? spec.host;
+
 // -t for interactive tasks so shells and watch loops get a real terminal;
 // without it ctrl-c does not reach the remote side and clear() does nothing.
-const args = task.tty ? ["-t", spec.host] : [spec.host];
+const args = task.tty ? ["-t", host] : [host];
 const res = spawnSync("ssh", [...args, task.run], { stdio: "inherit" });
 process.exit(res.status ?? 1);

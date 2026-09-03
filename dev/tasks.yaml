@@ -4,9 +4,12 @@
 #   npm run dev status     one of them
 #   npm run dev logs:ops
 #
-# Everything runs over the `proxmox` ssh alias, so these work on the office LAN
-# today. Off-LAN needs SSH published through the Cloudflare tunnel behind
-# Access - see README.
+# Two routes to the same machine, chosen with PVE_SSH_HOST:
+#   proxmox     direct to 10.20.1.43   office LAN only     (default)
+#   pve-remote  through the tunnel     works anywhere
+#
+#   npm run health            on the LAN
+#   npm run remote:health     from anywhere
 
 host: proxmox
 
