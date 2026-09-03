@@ -35,7 +35,7 @@ EXPORTER_ACTION = EXPORTER.replace("/metrics", "/action")
 # exporter is the security boundary, but rejecting here too means a typo in the
 # page cannot even reach it.
 ALLOWED_ACTIONS = {"fstrim", "ct_reboot", "ct_start", "ct_stop", "nic_rejoin",
-                   "governor", "host_reboot"}
+                   "governor", "host_reboot", "deploy"}
 PORT = int(os.environ.get("OPS_PORT", "8780"))
 AUTH_USER = os.environ.get("OPS_USER", "")
 AUTH_PASS = os.environ.get("OPS_PASS", "")
@@ -308,6 +308,12 @@ button.act.danger:hover:not(:disabled){background:var(--crit);color:#fff}
     <div id="thermal"></div>
   </div>
   <div class="card">
+    <h2>Deploy</h2>
+    <p class="note">Pulls <span class="mono">achiappone/pve-stack</span> and installs it to
+    the host and both containers. The box fetches - nothing pushes in.</p>
+    <div id="deploy"></div>
+  </div>
+  <div class="card">
     <h2>Network</h2>
     <p class="note">vmbr0 must list a physical port. If the USB dongle re-enumerates it
     comes back outside the bridge and the wired path dies silently.</p>
@@ -386,12 +392,21 @@ async function tick(){
   if(vmbr0Phys.length === 0){
     acts += `<button class="act warn" id="b-nic">vmbr0 has no uplink &mdash; rejoin nic0</button>`;
   }
+  const dep = h.deploy || {};
+  acts += `<button class="act" id="b-deploy"${dep.running ? " disabled" : ""}>${
+    dep.running ? "deploying..." : "Deploy from GitHub"}</button>`;
   acts += `<button class="act danger" id="b-hostreboot">Reboot pve-code1</button>`;
   el("hostact").innerHTML = acts;
   if(el("b-gov")) el("b-gov").onclick = ev =>
     doAction({do:"governor", value: other}, `governor -> ${other}`, ev.target);
   if(el("b-nic")) el("b-nic").onclick = ev =>
     doAction({do:"nic_rejoin"}, "rejoining nic0 to vmbr0", ev.target);
+  if(el("b-deploy")) el("b-deploy").onclick = ev => {
+    if(!confirm("Pull pve-stack from GitHub and install it?\n\n" +
+                "This restarts pve-ops, camrelay and the exporter.\n" +
+                "This page will blink as its own service restarts.")) return;
+    doAction({do:"deploy", branch:"main"}, "deploying from GitHub", ev.target);
+  };
   if(el("b-hostreboot")) el("b-hostreboot").onclick = ev => {
     // Two gates on purpose. This is the one action that takes down the page
     // you are clicking from, so the second dialog names what actually stops:
@@ -562,6 +577,23 @@ async function tick(){
       <span class="mono muted">${p.value}/255 ${p.enable === "1" ? "(manual)" : ""}</span></div>`).join("") +
     pick.slice(0, 8).map(([k, v]) => `<div class="row"><span>${k}</span>
       <span class="mono ${v >= 85 ? "crit" : v >= 70 ? "warn" : ""}">${v.toFixed(0)} °C</span></div>`).join("");
+
+  const dp = h.deploy || {};
+  el("deploy").innerHTML =
+    `<div class="row"><span>State</span><span class="mono ${dp.running ? "warn" : "good"}">${
+      dp.running ? "running" : "idle"}</span></div>` +
+    `<div id="deploylog" style="background:var(--bg);border:1px solid var(--rule);
+      padding:9px 11px;margin-top:10px;font-family:'IBM Plex Mono',monospace;
+      font-size:11.5px;line-height:1.5;max-height:190px;overflow:auto"></div>`;
+  const dl = el("deploylog");
+  if(dl) for(const line of (dp.lines || [])){
+    const d2 = document.createElement("div");
+    d2.className = /FAILED|fatal/.test(line) ? "crit"
+                 : /^ok:/.test(line) ? "good"
+                 : /^===/.test(line) ? "muted" : "";
+    d2.textContent = line;
+    dl.appendChild(d2);
+  }
 
   const net = h.network || {};
   const brs = Object.entries(net.bridges || {}).map(([b, ports]) => {
