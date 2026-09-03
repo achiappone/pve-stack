@@ -1,12 +1,13 @@
 [Unit]
-Description=Proxmox ops dashboard
+Description=Proxmox ops dashboard (Dev-Ops, TypeScript)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 EnvironmentFile=/etc/pve-ops.env
-ExecStart=/usr/bin/python3 /opt/opsdash.py
+WorkingDirectory=/opt/pve-ops
+ExecStart=/usr/bin/node /opt/pve-ops/dist/server.js
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

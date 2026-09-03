@@ -1,0 +1,148 @@
+/** Shapes returned by the Proxmox API and the host exporter.
+ *
+ *  These are hand-written rather than generated: the PVE API has no published
+ *  schema, and only a fraction of each response is used here. Everything is
+ *  optional because a node under load, or a token without a permission, can
+ *  omit fields without erroring. */
+
+export interface NodeMemory { total?: number; used?: number; free?: number; avail?: number }
+export interface NodeRootFs { total?: number; used?: number; avail?: number; free?: number }
+
+export interface NodeCpuInfo {
+  model?: string;
+  cores?: number;
+  cpus?: number;
+  sockets?: number;
+  mhz?: string;
+}
+
+export interface NodeStatus {
+  cpu?: number;
+  loadavg?: string[];
+  memory?: NodeMemory;
+  swap?: NodeMemory;
+  rootfs?: NodeRootFs;
+  uptime?: number;
+  kversion?: string;
+  pveversion?: string;
+  cpuinfo?: NodeCpuInfo;
+}
+
+export interface StorageEntry {
+  storage: string;
+  type?: string;
+  total?: number;
+  used?: number;
+  avail?: number;
+}
+
+export interface LxcEntry {
+  vmid: number;
+  name?: string;
+  status?: string;
+  mem?: number;
+  maxmem?: number;
+  uptime?: number;
+}
+
+export interface DiskEntry {
+  devpath?: string;
+  model?: string;
+  size?: number;
+  health?: string;
+  type?: string;
+  wearout?: number;
+}
+
+/* ---- host exporter (vmbr1, read-only + a fixed action allowlist) ---- */
+
+export interface Fan { chip: string; id: string; rpm: number }
+export interface Pwm { chip: string; id: string; value: number; enable: string | null }
+export interface TempReading { label: string; c: number }
+
+export interface Volume {
+  lv: string;
+  size_g: number;
+  alloc_pct: number;
+  pool: string | null;
+  error?: string;
+}
+
+export interface Battery {
+  name: string;
+  percent: number | null;
+  status: string | null;
+  cycles: string | null;
+  volts: number | null;
+  wh_now?: number;
+  wh_full?: number;
+}
+
+export interface Charger {
+  name: string; volts: number; amps: number; watts: number;
+  status: string | null; online: boolean;
+}
+
+export interface HostMetrics {
+  hwmon: { fans: Fan[]; pwm: Pwm[]; temps: Record<string, TempReading[]> };
+  volumes: Volume[];
+  network: {
+    bridges: Record<string, string[]>;
+    links: Record<string, { oper: string; carrier: string }>;
+  };
+  cpu: { governor: string; loadavg: string[]; driver: string };
+  power?: { battery: Battery | null; ac_online: boolean | null; charger: Charger | null;
+            minutes_to_full?: number };
+  deploy?: { lines: string[]; running: boolean };
+}
+
+/* ---- what this server hands the page ---- */
+
+export interface ServiceEntry {
+  ct: number | null;
+  name: string;
+  url: string;
+  desc?: string;
+  lan?: boolean;
+  host?: boolean;
+  external?: boolean;
+  self?: boolean;
+}
+
+export interface ProbeResult {
+  up: boolean;
+  code?: number;
+  ms: number;
+  err?: string;
+}
+
+export interface Snapshot {
+  ok: true;
+  errors: string[];
+  services: ServiceEntry[];
+  probes: Record<string, ProbeResult>;
+  node?: NodeStatus;
+  storage?: StorageEntry[];
+  lxc?: LxcEntry[];
+  disks?: DiskEntry[];
+  host?: HostMetrics;
+}
+
+export type ActionName =
+  | "fstrim" | "ct_reboot" | "ct_start" | "ct_stop"
+  | "nic_rejoin" | "governor" | "host_reboot" | "deploy";
+
+export interface ActionBody {
+  do?: string;
+  ct?: string | number;
+  value?: string;
+  branch?: string;
+  confirm?: string;
+}
+
+export interface ActionResult {
+  ok: boolean;
+  out?: string;
+  err?: string;
+  rc?: number;
+}

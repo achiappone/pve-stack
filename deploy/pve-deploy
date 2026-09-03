@@ -32,12 +32,19 @@ git -C "$REPO" --no-pager log --oneline -1
 
 # Containers first. The exporter goes last because restarting it ends whatever
 # connection asked for this deploy.
-if [ -f "$REPO/ops/opsdash.py" ]; then
-  pct push 102 "$REPO/ops/opsdash.py" /opt/opsdash.py --perms 755 \
-    && pct push 102 "$REPO/systemd/pve-ops.service" /etc/systemd/system/pve-ops.service \
-    && pct exec 102 -- systemctl daemon-reload \
-    && pct exec 102 -- systemctl restart pve-ops \
-    && echo "ok: 102 pve-ops" || echo "FAILED: 102 pve-ops"
+# ops dashboard: TypeScript, compiled. dist/ is committed so the container
+# needs only a node runtime - the server has zero runtime dependencies, so
+# there is no npm install to do on the box.
+if [ -d "$REPO/ops-ts/dist" ]; then
+  pct exec 102 -- mkdir -p /opt/pve-ops/dist
+  ok=1
+  for f in "$REPO"/ops-ts/dist/*.js; do
+    pct push 102 "$f" "/opt/pve-ops/dist/$(basename "$f")" --perms 644 || ok=0
+  done
+  pct push 102 "$REPO/systemd/pve-ops.service" /etc/systemd/system/pve-ops.service || ok=0
+  pct exec 102 -- systemctl daemon-reload
+  pct exec 102 -- systemctl restart pve-ops || ok=0
+  [ "$ok" = 1 ] && echo "ok: 102 pve-ops (typescript)" || echo "FAILED: 102 pve-ops"
 fi
 
 if [ -f "$REPO/camera/camrelay.py" ]; then
