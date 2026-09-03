@@ -148,7 +148,11 @@ def deploy_state():
 def cpu():
     g = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "?")
     la = read("/proc/loadavg", "").split()[:3]
+    avail = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors", "")
     return {"governor": g, "loadavg": la,
+            # What the kernel actually offers, so the dashboard can list real
+            # options rather than assuming performance/powersave.
+            "available": avail.split() if avail else [],
             "driver": read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver", "?")}
 
 
