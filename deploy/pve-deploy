@@ -62,8 +62,16 @@ if [ -f "$REPO/camera/camrelay.py" ]; then
   pct push 101 "$REPO/camera/camrelay.py" /opt/camrelay.py --perms 755 \
     && pct push 101 "$REPO/systemd/camrelay.service" /etc/systemd/system/camrelay.service \
     && pct exec 101 -- systemctl daemon-reload \
-    && pct exec 101 -- systemctl restart camrelay \
-    && echo "ok: 101 camrelay" || echo "FAILED: 101 camrelay"
+    && echo "ok: 101 camrelay files" || echo "FAILED: 101 camrelay files"
+  # Only restart it if it is enabled. camrelay runs headless Chromium against a
+  # 1080p stream continuously and took this host to 98 C; it is deliberately
+  # disabled until it becomes on-demand. An unconditional restart here silently
+  # re-ignited that after every deploy.
+  if pct exec 101 -- systemctl is-enabled camrelay >/dev/null 2>&1; then
+    pct exec 101 -- systemctl restart camrelay && echo "ok: 101 camrelay restarted"
+  else
+    echo "skip: 101 camrelay is disabled - not starting it"
+  fi
 fi
 
 for f in k2-deploy k2-set-smtp pve-deploy; do
