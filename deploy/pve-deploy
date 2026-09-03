@@ -16,6 +16,11 @@ exec >>"$LOG" 2>&1
 
 REPO=/opt/pve-stack
 BRANCH="${1:-main}"
+
+# Explicit key, not /root/.ssh/config. The exporter unit sets ProtectHome=true,
+# so a deploy spawned from it cannot see /root at all - the ssh alias and key
+# there are invisible and git fails with a DNS error that looks unrelated.
+export GIT_SSH_COMMAND="ssh -i /etc/pve-deploy/key -o IdentitiesOnly=yes -o UserKnownHostsFile=/etc/pve-deploy/known_hosts"
 echo "=== $(date -Is) deploy start (branch $BRANCH) ==="
 
 git -C "$REPO" fetch --depth 1 origin "$BRANCH" || { echo "FAILED: fetch"; exit 1; }
