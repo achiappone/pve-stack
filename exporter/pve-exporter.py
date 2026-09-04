@@ -197,6 +197,17 @@ def refresh_units():
         time.sleep(20)
 
 
+# What each Dell thermal profile implies for the CPU governor. Fans are not in
+# this table on purpose: dell_smm_hwmon is loaded without force=1, so pwm writes
+# on this model are refused and the EC owns fan speed regardless of what we say.
+PROFILE_GOVERNOR = {
+    "performance": "performance",
+    "balanced": "powersave",
+    "cool": "powersave",
+    "quiet": "powersave",
+}
+
+
 def profile_paths():
     """Where the Dell firmware thermal mode lives.
 
@@ -331,14 +342,34 @@ def do_action(body):
         # Both paths drive the same firmware control, so the first write that
         # lands is the whole job.
         errs = []
-        for p in profile_paths():
+        wrote = False
+        for path in profile_paths():
             try:
-                open(p, "w").write(v)
-                return {"ok": True, "out": f"platform profile -> {v}"}
+                open(path, "w").write(v)
+                wrote = True
+                break
             except Exception as e:
-                errs.append(f"{p}: {e}")
-        return {"ok": False,
-                "err": "; ".join(errs[:3]) or "no platform_profile control on this host"}
+                errs.append(f"{path}: {e}")
+        if not wrote:
+            return {"ok": False,
+                    "err": "; ".join(errs[:3]) or "no platform_profile control on this host"}
+
+        # The profile sets the thermal envelope; the governor decides whether
+        # the CPU tries to fill it. Left independent, "quiet" with the governor
+        # still pinned to performance is the combination that cooks this box -
+        # so one control moves both. The governor can still be set on its own
+        # afterwards for a deliberate mismatch.
+        g = PROFILE_GOVERNOR.get(v)
+        gov_note = ""
+        if g and g in governors():
+            gerrs = []
+            for f in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor"):
+                try:
+                    open(f, "w").write(g)
+                except Exception as e:
+                    gerrs.append(str(e))
+            gov_note = f", governor -> {g}" if not gerrs else f", governor FAILED ({gerrs[0]})"
+        return {"ok": True, "out": f"platform profile -> {v}{gov_note}"}
 
     return {"ok": False, "err": f"unknown action {act!r}"}
 
