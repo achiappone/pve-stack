@@ -37,6 +37,12 @@ export const config = {
     user: pick("OPS_USER"),
     pass: pick("OPS_PASS"),
     probeSeconds: Number(pick("OPS_PROBE_SECONDS", "60")),
+    // Sampling for the thermal history and the down counters. Deliberately
+    // slower than the page's 5s tick: at 5s this writes 17k lines a day to an
+    // SSD whose wearout this same dashboard reports. 30s is ~2900 lines.
+    stateDir: pick("OPS_STATE_DIR", "/var/lib/pve-ops"),
+    historySeconds: Number(pick("OPS_HISTORY_SECONDS", "30")),
+    historyDays: Number(pick("OPS_HISTORY_DAYS", "7")),
 };
 export const loginRequired = Boolean(config.user && config.pass);
 export const exporterAction = config.exporter.replace("/metrics", "/action");

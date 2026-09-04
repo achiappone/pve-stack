@@ -3,6 +3,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, loginRequired } from "./config.js";
 import { pve, hostMetrics, hostAction, probe } from "./pve.js";
 import { PAGE, LOGIN_HTML } from "./page.js";
+import { clearDowns, getDowns, readHistory, sampleLoop } from "./history.js";
 /** Which container serves what. Not derivable from the PVE API - it knows the
  *  containers exist but nothing about the hostnames they answer on. */
 const SERVICES = [
@@ -17,7 +18,11 @@ const SERVICES = [
     { ct: null, name: "Atlas", url: "https://atlaspd.com/login", desc: "", external: true },
 ];
 /** Mirrored from the exporter's allowlist. The exporter is the security
- *  boundary; rejecting here too means a typo cannot even reach it. */
+ *  boundary; rejecting here too means a typo cannot even reach it.
+ *
+ *  clear_downs is deliberately absent: it is this server's own state, so it is
+ *  answered before this check rather than forwarded to an exporter that has
+ *  never heard of it. */
 const ALLOWED_ACTIONS = new Set([
     "fstrim", "ct_reboot", "ct_start", "ct_stop",
     "nic_rejoin", "governor", "host_reboot", "deploy",
@@ -45,7 +50,10 @@ function sessionOk(req) {
     return false;
 }
 async function snapshot() {
-    const out = { ok: true, errors: [], services: SERVICES, probes };
+    // downs is a plain in-memory read, so it belongs here and not in the
+    // parallel jobs below - there is nothing to await and nothing to fail.
+    const out = { ok: true, errors: [], services: SERVICES, probes,
+        downs: getDowns() };
     const n = config.pveNode;
     const jobs = [
         ["node status", async () => { out.node = await pve(`/nodes/${n}/status`); }],
@@ -149,6 +157,10 @@ async function handle(req, res) {
     }
     if (req.method === "POST" && url === "/api/action") {
         const body = (await readBody(req));
+        if (body.do === "clear_downs") {
+            const ok = clearDowns(String(body.target ?? ""));
+            return sendJson(res, ok ? 200 : 400, ok ? { ok: true, out: "cleared" } : { ok: false, err: "unknown target" });
+        }
         if (!ALLOWED_ACTIONS.has(body.do)) {
             return sendJson(res, 400, { ok: false, err: `action ${String(body.do)} not allowed` });
         }
@@ -159,10 +171,20 @@ async function handle(req, res) {
         return sendHtml(res, PAGE);
     if (req.method === "GET" && url === "/api/snapshot")
         return sendJson(res, 200, await snapshot());
+    if (req.method === "GET" && url.startsWith("/api/history")) {
+        // Clamped, not trusted: this number sizes a read loop, and NaN would make
+        // the cutoff NaN and quietly return nothing.
+        const raw = Number(new URL(url, "http://x").searchParams.get("hours"));
+        const hours = Number.isFinite(raw)
+            ? Math.min(Math.max(raw, 1), config.historyDays * 24)
+            : 6;
+        return sendJson(res, 200, readHistory(hours));
+    }
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("not found");
 }
 void probeLoop();
+void sampleLoop();
 server.listen(config.port, config.bind, () => {
     console.log(`pve-ops (typescript) on ${config.bind}:${config.port}  node=${config.pveNode}  ` +
         `login=${loginRequired ? "on" : "OFF"}`);

@@ -126,11 +126,15 @@ export interface Snapshot {
   lxc?: LxcEntry[];
   disks?: DiskEntry[];
   host?: HostMetrics;
+  downs?: Record<string, DownRecord>;
 }
 
 export type ActionName =
   | "fstrim" | "ct_reboot" | "ct_start" | "ct_stop"
-  | "nic_rejoin" | "governor" | "host_reboot" | "deploy";
+  | "nic_rejoin" | "governor" | "host_reboot" | "deploy"
+  // Handled here, never forwarded to the exporter: the counters are this
+  // server's own state, so clear_downs is absent from ALLOWED_ACTIONS.
+  | "clear_downs";
 
 export interface ActionBody {
   do?: string;
@@ -138,6 +142,7 @@ export interface ActionBody {
   value?: string;
   branch?: string;
   confirm?: string;
+  target?: string;
 }
 
 export interface ActionResult {
@@ -145,4 +150,26 @@ export interface ActionResult {
   out?: string;
   err?: string;
   rc?: number;
+}
+
+/* ---- retained state: thermal history and down counters ---- */
+
+/** One sample of the charted series, keyed by the same labels the Thermals
+ *  panel already builds (`"coretemp Package id 0"`, `"fan1"`). Stored one per
+ *  line as JSON, so the keys travel with every point and a chip appearing or
+ *  disappearing mid-history is not a schema change. */
+export interface Sample {
+  t: number;                        // epoch seconds
+  temps: Record<string, number>;    // degrees C
+  fans: Record<string, number>;     // rpm
+}
+
+/** A link, bridge or container's outage tally. `since` is when the count was
+ *  last cleared, so "3 downs" always has a window attached to it. */
+export interface DownRecord {
+  downs: number;
+  down: boolean;
+  lastDown?: number;
+  lastUp?: number;
+  since: number;
 }

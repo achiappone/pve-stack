@@ -13,6 +13,9 @@ RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
+# ProtectSystem=strict makes /var/lib read-only; this punches a hole for the
+# thermal history and down counters and creates /var/lib/pve-ops on start.
+StateDirectory=pve-ops
 ProtectHome=true
 
 [Install]
