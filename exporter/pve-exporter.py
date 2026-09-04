@@ -78,8 +78,14 @@ def network():
         n = os.path.basename(i)
         if n == "lo":
             continue
-        out["links"][n] = {"oper": read(f"{i}/operstate", "?"),
-                           "carrier": read(f"{i}/carrier", "?")}
+        # bonding_masters is a plain file in this directory, not an interface.
+        # Without this it lists as a link in state "?" and, now that outages
+        # are counted per link, would accrue a tally for something that cannot
+        # go down because it was never up.
+        oper = read(f"{i}/operstate")
+        if oper is None:
+            continue
+        out["links"][n] = {"oper": oper, "carrier": read(f"{i}/carrier", "?")}
     return out
 
 
