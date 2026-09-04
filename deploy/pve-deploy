@@ -79,6 +79,14 @@ for f in k2-deploy k2-set-smtp pve-deploy; do
 done
 [ -f "$REPO/deploy/pve-fstrim.cron" ] && install -m644 "$REPO/deploy/pve-fstrim.cron" /etc/cron.d/pve-fstrim && echo "ok: fstrim cron"
 
+# Fan control needs force=1 on this model. Installed but never auto-applied:
+# reloading the module is what makes it take effect, and doing that from a
+# deploy would drop the hwmon device out from under the running exporter.
+if [ -f "$REPO/modprobe.d/dell-smm-hwmon.conf" ]; then
+  install -m644 "$REPO/modprobe.d/dell-smm-hwmon.conf" /etc/modprobe.d/dell-smm-hwmon.conf \
+    && echo "ok: modprobe.d/dell-smm-hwmon.conf (takes effect on module reload or reboot)"
+fi
+
 install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"
 install -m644 "$REPO/systemd/pve-exporter.service" /etc/systemd/system/pve-exporter.service
 systemctl daemon-reload

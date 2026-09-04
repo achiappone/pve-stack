@@ -197,15 +197,39 @@ def refresh_units():
         time.sleep(20)
 
 
-# What each Dell thermal profile implies for the CPU governor. Fans are not in
-# this table on purpose: dell_smm_hwmon is loaded without force=1, so pwm writes
-# on this model are refused and the EC owns fan speed regardless of what we say.
-PROFILE_GOVERNOR = {
-    "performance": "performance",
-    "balanced": "powersave",
-    "cool": "powersave",
-    "quiet": "powersave",
+# What each Dell thermal profile implies for the CPU.
+#
+# The governor is nearly inert here: intel_pstate's powersave still boosts to
+# full turbo, which is why toggling it looks like it does nothing. The knob
+# that actually moves this hardware is energy_performance_preference, measured
+# on this box at 4776 MHz for "performance" against 800 MHz for "power" - a six
+# times swing where the governor showed none. Both are set, EPP because it
+# works and the governor because leaving it contradicting the profile is how
+# you end up in "quiet" with every core pinned.
+#
+# Fans are deliberately absent. Every write path the kernel offers is refused
+# on this model - sysfs pwm, pwm_enable, and the /proc/i8k ioctl behind i8kctl
+# - with and without force=1, because dell_smm_hwmon binds over WMI here and
+# the firmware exposes no fan-set capability. The EC owns fan speed, and it
+# does the job: 0 rpm at 43 C, 3225 rpm at 82 C.
+EPP_PATH = "/sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference"
+PROFILE_CPU = {
+    "performance": ("performance", "performance"),
+    "balanced": ("powersave", "balance_performance"),
+    "cool": ("powersave", "balance_power"),
+    "quiet": ("powersave", "power"),
 }
+
+
+def write_all(pattern, value):
+    """Write one value to every matching cpu sysfs file. Returns the errors."""
+    errs = []
+    for f in glob.glob(pattern):
+        try:
+            open(f, "w").write(value)
+        except Exception as e:
+            errs.append(str(e))
+    return errs
 
 
 def profile_paths():
@@ -242,7 +266,12 @@ def cpu():
             # "powersave" still boosts to full turbo under load, which is why
             # toggling it looks like it does nothing.
             "profile": (read(profile_paths()[0]) if profile_paths() else None),
-            "profiles": profile_choices()}
+            "profiles": profile_choices(),
+            # The knob that actually throttles this CPU. Worth showing next to
+            # the governor precisely because the governor is the one people
+            # expect to matter and it is the one that does not.
+            "epp": read("/sys/devices/system/cpu/cpu0/cpufreq/"
+                        "energy_performance_preference")}
 
 
 # ----------------------------------------------------------------- actions
@@ -359,17 +388,15 @@ def do_action(body):
         # still pinned to performance is the combination that cooks this box -
         # so one control moves both. The governor can still be set on its own
         # afterwards for a deliberate mismatch.
-        g = PROFILE_GOVERNOR.get(v)
-        gov_note = ""
+        notes = []
+        g, epp = PROFILE_CPU.get(v, (None, None))
         if g and g in governors():
-            gerrs = []
-            for f in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor"):
-                try:
-                    open(f, "w").write(g)
-                except Exception as e:
-                    gerrs.append(str(e))
-            gov_note = f", governor -> {g}" if not gerrs else f", governor FAILED ({gerrs[0]})"
-        return {"ok": True, "out": f"platform profile -> {v}{gov_note}"}
+            errs = write_all("/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor", g)
+            notes.append(f"governor -> {g}" if not errs else f"governor FAILED ({errs[0]})")
+        if epp:
+            errs = write_all(EPP_PATH, epp)
+            notes.append(f"epp -> {epp}" if not errs else f"epp FAILED ({errs[0]})")
+        return {"ok": True, "out": ", ".join([f"platform profile -> {v}"] + notes)}
 
     return {"ok": False, "err": f"unknown action {act!r}"}
 

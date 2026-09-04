@@ -103,6 +103,9 @@ export interface HostMetrics {
      *  Unrelated to the governor, and the one that moves the fans. */
     profile?: string | null;
     profiles?: string[];
+    /** energy_performance_preference - the knob that actually throttles
+     *  this CPU. The governor barely moves it. */
+    epp?: string | null;
   };
   power?: { battery: Battery | null; ac_online: boolean | null; charger: Charger | null;
             minutes_to_full?: number };
