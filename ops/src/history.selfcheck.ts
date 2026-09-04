@@ -17,7 +17,8 @@ process.env["OPS_STATE_DIR"] = dir;
 process.env["OPS_HISTORY_DAYS"] = "7";
 
 // Dynamic, so the env above is in place before config.ts reads it.
-const { observe, observationsFrom, clearDowns, getDowns, thin, readHistory, prune, sampleFrom } =
+const { observe, observationsFrom, clearDowns, getDowns, thin, readHistory, prune,
+        sampleFrom, pruneStale } =
   await import("./history.js");
 
 const T = 1_757_000_000;                       // a fixed epoch; nothing here is clock-dependent
@@ -68,6 +69,25 @@ const brBad = { network: { bridges: { vmbr0: ["veth101i0"] }, links: {} } };
 observe(observationsFrom(brUp as never, []), T);
 observe(observationsFrom(brBad as never, []), T + 30);
 assert.equal(getDowns()["bridge:vmbr0"]!.downs, 1, "bridge losing its uplink is a down");
+
+/* 5b. vmbr1 has no physical port by design - it is how the exporter stays
+ *     unreachable from the LAN. It must never be tracked at all, or it reads
+ *     as permanently down. */
+observe(observationsFrom({ network: { bridges: { vmbr1: ["veth102i1"] }, links: {} } } as never, []), T);
+assert.ok(!("bridge:vmbr1" in getDowns()), "a deliberately portless bridge is not an outage");
+
+/* 5c. A record for something that no longer exists is dropped only if it never
+ *     recorded an outage. A tally is history worth keeping. */
+{
+  observe([{ key: "net:gone", up: true }], T);        // downs 0, will vanish
+  assert.ok("net:gone" in getDowns());
+  assert.equal(getDowns()["net:eth0"]!.downs, 1);     // has a tally, must survive
+  const stillHere = [{ key: "net:eth0", up: true }];
+  assert.equal(pruneStale(stillHere), true, "a stale zero-count record is dropped");
+  assert.ok(!("net:gone" in getDowns()), "vanished and never down -> removed");
+  assert.ok("net:eth0" in getDowns(), "vanished but had outages -> kept");
+  assert.equal(pruneStale(stillHere), false, "a second pass has nothing left to do");
+}
 
 /* 6. A failed exporter fetch yields no observations - absence of data must
  *    never read as "everything went down at once". */

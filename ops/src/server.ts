@@ -3,6 +3,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, loginRequired } from "./config.js";
 import { pve, hostMetrics, hostAction, probe } from "./pve.js";
 import { PAGE, LOGIN_HTML } from "./page.js";
+import { VERSION } from "./version.js";
 import { clearDowns, getDowns, readHistory, sampleLoop } from "./history.js";
 import type {
   ActionBody, ActionName, DiskEntry, HostMetrics, LxcEntry,
@@ -61,7 +62,7 @@ async function snapshot(): Promise<Snapshot> {
   // downs is a plain in-memory read, so it belongs here and not in the
   // parallel jobs below - there is nothing to await and nothing to fail.
   const out: Snapshot = { ok: true, errors: [], services: SERVICES, probes,
-                          downs: getDowns() };
+                          downs: getDowns(), version: VERSION };
   const n = config.pveNode;
   const jobs: Array<[string, () => Promise<void>]> = [
     ["node status", async () => { out.node = await pve<NodeStatus>(`/nodes/${n}/status`); }],
@@ -168,7 +169,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return sendJson(res, status, result);
   }
 
-  if (req.method === "GET" && (url === "/" || url === "/index.html")) return sendHtml(res, PAGE);
+  if (req.method === "GET" && (url === "/" || url === "/index.html")) {
+    return sendHtml(res, PAGE.replace("{{VERSION}}", VERSION));
+  }
   if (req.method === "GET" && url === "/api/snapshot") return sendJson(res, 200, await snapshot());
   if (req.method === "GET" && url.startsWith("/api/history")) {
     // Clamped, not trusted: this number sizes a read loop, and NaN would make

@@ -29,7 +29,16 @@ def hwmon():
         for f in sorted(glob.glob(f"{h}/fan*_input")):
             v = read(f)
             if v and v.isdigit():
-                out["fans"].append({"chip": name, "id": os.path.basename(f), "rpm": int(v)})
+                # rpm alone says nothing about how hard the fan is working.
+                # max is the ceiling and target is what the EC is aiming for -
+                # rpm tracking target is the firmware doing its job, and is the
+                # thing worth seeing next to it.
+                base = f[:-len("_input")]
+                mx, tgt = read(f"{base}_max"), read(f"{base}_target")
+                out["fans"].append({
+                    "chip": name, "id": os.path.basename(f), "rpm": int(v),
+                    "max": int(mx) if mx and mx.isdigit() else None,
+                    "target": int(tgt) if tgt and tgt.isdigit() else None})
         for f in sorted(glob.glob(f"{h}/pwm[0-9]")):
             v, en = read(f), read(f + "_enable")
             if v and v.isdigit():

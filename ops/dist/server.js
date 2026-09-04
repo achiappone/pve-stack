@@ -3,6 +3,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, loginRequired } from "./config.js";
 import { pve, hostMetrics, hostAction, probe } from "./pve.js";
 import { PAGE, LOGIN_HTML } from "./page.js";
+import { VERSION } from "./version.js";
 import { clearDowns, getDowns, readHistory, sampleLoop } from "./history.js";
 /** Which container serves what. Not derivable from the PVE API - it knows the
  *  containers exist but nothing about the hostnames they answer on. */
@@ -53,7 +54,7 @@ async function snapshot() {
     // downs is a plain in-memory read, so it belongs here and not in the
     // parallel jobs below - there is nothing to await and nothing to fail.
     const out = { ok: true, errors: [], services: SERVICES, probes,
-        downs: getDowns() };
+        downs: getDowns(), version: VERSION };
     const n = config.pveNode;
     const jobs = [
         ["node status", async () => { out.node = await pve(`/nodes/${n}/status`); }],
@@ -167,8 +168,9 @@ async function handle(req, res) {
         const { status, result } = await hostAction(body);
         return sendJson(res, status, result);
     }
-    if (req.method === "GET" && (url === "/" || url === "/index.html"))
-        return sendHtml(res, PAGE);
+    if (req.method === "GET" && (url === "/" || url === "/index.html")) {
+        return sendHtml(res, PAGE.replace("{{VERSION}}", VERSION));
+    }
     if (req.method === "GET" && url === "/api/snapshot")
         return sendJson(res, 200, await snapshot());
     if (req.method === "GET" && url.startsWith("/api/history")) {

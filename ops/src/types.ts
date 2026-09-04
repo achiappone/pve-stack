@@ -56,7 +56,13 @@ export interface DiskEntry {
 
 /* ---- host exporter (vmbr1, read-only + a fixed action allowlist) ---- */
 
-export interface Fan { chip: string; id: string; rpm: number }
+export interface Fan {
+  chip: string; id: string; rpm: number;
+  /** Ceiling and the EC's current aim. rpm sitting on target is the
+   *  firmware controlling the fan, which is the normal state. */
+  max?: number | null;
+  target?: number | null;
+}
 export interface Pwm { chip: string; id: string; value: number; enable: string | null }
 export interface TempReading { label: string; c: number }
 
@@ -134,6 +140,8 @@ export interface Snapshot {
   disks?: DiskEntry[];
   host?: HostMetrics;
   downs?: Record<string, DownRecord>;
+  /** So a deploy can be confirmed from the API, not just by eye. */
+  version?: string;
 }
 
 export type ActionName =

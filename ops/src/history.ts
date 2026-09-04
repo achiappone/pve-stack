@@ -125,6 +125,26 @@ function loadDowns(): void {
   }
 }
 
+/** Drop records for things that no longer exist and never went down: an
+ *  interface that was renamed or removed, a container that was deleted, or a
+ *  key an older version of this code created and no longer does.
+ *
+ *  Only ever called when both fetches succeeded, so an empty observation list
+ *  means "nothing is there" rather than "we could not ask". Anything with a
+ *  tally is kept - that is history someone may still want to look at. */
+export function pruneStale(obs: Observation[]): boolean {
+  const live = new Set(obs.map((o) => o.key));
+  let changed = false;
+  for (const key of Object.keys(downs)) {
+    if (!live.has(key) && downs[key]!.downs === 0) {
+      delete downs[key];
+      delete lastSeen[key];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /** Turn one poll into the flat list the state machine wants. Only things we
  *  actually heard about are included - a failed exporter fetch must not read
  *  as "every link went down at once". */
@@ -138,7 +158,12 @@ export function observationsFrom(host?: HostMetrics, lxc?: LxcEntry[]): Observat
     // A bridge whose last physical port left is the failure this box actually
     // has: the USB NIC re-enumerates, the bridge stays "up", and the wired
     // path is gone. Link state alone never shows it.
-    obs.push({ key: `bridge:${br}`, up: ports.some((p) => !p.startsWith("veth")) });
+    const up = ports.some((p) => !p.startsWith("veth"));
+    // But vmbr1 has no physical port on purpose - that is the whole reason the
+    // exporter is only reachable from containers attached to it. Judging every
+    // bridge by the same rule marks it permanently down. Only bridges that
+    // have an uplink, or already lost one we were watching, are tracked.
+    if (up || `bridge:${br}` in downs) obs.push({ key: `bridge:${br}`, up });
   }
   for (const c of lxc ?? []) {
     obs.push({ key: `ct:${c.vmid}`, up: c.status === "running", uptime: c.uptime ?? 0 });
@@ -255,7 +280,12 @@ async function sampleOnce(): Promise<void> {
   ]);
   if (host) appendSample(sampleFrom(host, t));
   if (host || lxc) {
-    if (observe(observationsFrom(host, lxc), t)) saveDowns();
+    const obs = observationsFrom(host, lxc);
+    let changed = observe(obs, t);
+    // Only safe to prune when the whole picture came back; a half-failed poll
+    // would otherwise read as "these things no longer exist".
+    if (host && lxc && pruneStale(obs)) changed = true;
+    if (changed) saveDowns();
   }
 }
 

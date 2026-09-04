@@ -58,6 +58,23 @@ container 102 is currently the only member.
 * **Cloudflare replaces origin 5xx** with its own error page, swallowing the
   body. Return 4xx for anything whose message the UI needs to show.
 
+## Versioning
+
+    1.00.001
+    │ │  └── patch  small changes, fixes, tweaks: 002, 003, 004...
+    │ └───── minor  bigger changes: a new panel, a new control
+    └─────── major  architecture changes
+
+Defined once in `ops/src/version.ts`. The server substitutes it into the page
+header and returns it on `/api/snapshot`, so you can tell whether what you are
+looking at is the code you just deployed without opening a shell.
+
+Bump it in the same commit as the change, and tag the commit `vX.YY.ZZZ`.
+
+Note that `pve-deploy` pulls from GitHub, not from a working copy - a change
+that is committed but not pushed will not deploy, and the deploy will report
+success having installed the previous version.
+
 ## Secrets
 
 None are in this repo. They live in env files at mode 600 on the boxes:
