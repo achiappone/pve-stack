@@ -188,6 +188,25 @@ def refresh_units():
         time.sleep(20)
 
 
+def profile_paths():
+    """Where the Dell firmware thermal mode lives.
+
+    Two sysfs locations expose the same control - the legacy ACPI file and the
+    newer platform-profile class - and which of them is writable varies by
+    kernel version, so collect both rather than assume one."""
+    return ([p for p in ["/sys/firmware/acpi/platform_profile"] if os.path.exists(p)]
+            + sorted(glob.glob("/sys/class/platform-profile/*/profile")))
+
+
+def profile_choices():
+    for p in (["/sys/firmware/acpi/platform_profile_choices"]
+              + sorted(glob.glob("/sys/class/platform-profile/*/choices"))):
+        v = read(p)
+        if v:
+            return v.split()
+    return []
+
+
 def cpu():
     g = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "?")
     la = read("/proc/loadavg", "").split()[:3]
@@ -196,7 +215,14 @@ def cpu():
             # What the kernel actually offers, so the dashboard can list real
             # options rather than assuming performance/powersave.
             "available": avail.split() if avail else [],
-            "driver": read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver", "?")}
+            "driver": read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver", "?"),
+            # The Dell firmware thermal mode, which is a different thing from
+            # the governor and is the one that actually moves the fans. The
+            # governor only picks CPU frequencies; on intel_pstate even
+            # "powersave" still boosts to full turbo under load, which is why
+            # toggling it looks like it does nothing.
+            "profile": (read(profile_paths()[0]) if profile_paths() else None),
+            "profiles": profile_choices()}
 
 
 # ----------------------------------------------------------------- actions
@@ -286,6 +312,24 @@ def do_action(body):
             except Exception as e:
                 errs.append(str(e))
         return {"ok": not errs, "out": f"governor -> {g}", "err": "; ".join(errs[:3])}
+
+    if act == "platform_profile":
+        v = str(body.get("value", ""))
+        choices = profile_choices()
+        if v not in choices:
+            return {"ok": False,
+                    "err": f"profile {v!r} not offered (have: {' '.join(choices) or 'none'})"}
+        # Both paths drive the same firmware control, so the first write that
+        # lands is the whole job.
+        errs = []
+        for p in profile_paths():
+            try:
+                open(p, "w").write(v)
+                return {"ok": True, "out": f"platform profile -> {v}"}
+            except Exception as e:
+                errs.append(f"{p}: {e}")
+        return {"ok": False,
+                "err": "; ".join(errs[:3]) or "no platform_profile control on this host"}
 
     return {"ok": False, "err": f"unknown action {act!r}"}
 

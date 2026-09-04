@@ -90,7 +90,14 @@ export interface HostMetrics {
     bridges: Record<string, string[]>;
     links: Record<string, { oper: string; carrier: string }>;
   };
-  cpu: { governor: string; loadavg: string[]; driver: string };
+  cpu: {
+    governor: string; loadavg: string[]; driver: string;
+    available?: string[];
+    /** Dell firmware thermal mode - cool/quiet/balanced/performance.
+     *  Unrelated to the governor, and the one that moves the fans. */
+    profile?: string | null;
+    profiles?: string[];
+  };
   power?: { battery: Battery | null; ac_online: boolean | null; charger: Charger | null;
             minutes_to_full?: number };
   deploy?: { lines: string[]; running: boolean };
@@ -131,7 +138,7 @@ export interface Snapshot {
 
 export type ActionName =
   | "fstrim" | "ct_reboot" | "ct_start" | "ct_stop"
-  | "nic_rejoin" | "governor" | "host_reboot" | "deploy"
+  | "nic_rejoin" | "governor" | "host_reboot" | "deploy" | "platform_profile"
   // Handled here, never forwarded to the exporter: the counters are this
   // server's own state, so clear_downs is absent from ALLOWED_ACTIONS.
   | "clear_downs";
