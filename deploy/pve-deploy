@@ -82,10 +82,11 @@ done
 # Fan control needs force=1 on this model. Installed but never auto-applied:
 # reloading the module is what makes it take effect, and doing that from a
 # deploy would drop the hwmon device out from under the running exporter.
-if [ -f "$REPO/modprobe.d/dell-smm-hwmon.conf" ]; then
-  install -m644 "$REPO/modprobe.d/dell-smm-hwmon.conf" /etc/modprobe.d/dell-smm-hwmon.conf \
-    && echo "ok: modprobe.d/dell-smm-hwmon.conf (takes effect on module reload or reboot)"
-fi
+for f in "$REPO"/modprobe.d/*.conf; do
+  [ -f "$f" ] || continue
+  install -m644 "$f" "/etc/modprobe.d/$(basename "$f")" \
+    && echo "ok: modprobe.d/$(basename "$f") (takes effect on module reload or reboot)"
+done
 
 install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"
 install -m644 "$REPO/systemd/pve-exporter.service" /etc/systemd/system/pve-exporter.service
