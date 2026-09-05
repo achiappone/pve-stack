@@ -47,6 +47,12 @@ export interface LxcEntry {
 
 export interface DiskEntry {
   devpath?: string;
+  /** /dev/disk/by-id path. The only bus hint the API gives: a USB disk's
+   *  link starts "usb-", which is how the page tags one. */
+  by_id_link?: string;
+  /** What claims the disk - "LVM", "BIOS boot", "partitions" - or absent
+   *  when nothing does, which is the state a fresh backup drive is in. */
+  used?: string;
   model?: string;
   size?: number;
   health?: string;

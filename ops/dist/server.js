@@ -14,8 +14,8 @@ const SERVICES = [
         desc: "this page", self: true },
     { ct: 100, name: "Nginx Proxy Manager", url: "http://10.20.1.46:81",
         desc: "unused", lan: true },
-    { ct: null, name: "Proxmox VE", url: "https://10.20.1.43:8006",
-        desc: "stock PVE interface", lan: true, host: true },
+    { ct: null, name: "Proxmox VE", url: "https://pve.anthonychiappone.com",
+        desc: "stock PVE interface", host: true },
     { ct: null, name: "Atlas", url: "https://atlaspd.com/login", desc: "", external: true },
 ];
 /** Mirrored from the exporter's allowlist. The exporter is the security
