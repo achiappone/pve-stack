@@ -12,7 +12,7 @@ credentials-file: /etc/cloudflared/9c320e89-1beb-4267-98e1-95b8f07d0383.json
 # (ssh.anthonychiappone.com was already taken by an unrelated record.)
 #
 # The same applies to pve.* below, more so: it is the hypervisor's root login
-# page. Both hostnames must sit behind a Cloudflare Access policy.
+# page. Every hostname here must sit behind a Cloudflare Access policy.
 ingress:
   - hostname: ops.anthonychiappone.com
     service: http://localhost:8780
@@ -25,4 +25,12 @@ ingress:
     service: https://10.20.1.43:8006
     originRequest:
       noTLSVerify: true
+  # The monitoring stack in 103/104/105. Each binds only its vmbr1 address, so
+  # this tunnel is the single way in - nothing of theirs is on the office LAN.
+  - hostname: beszel.anthonychiappone.com
+    service: http://10.10.10.3:8090
+  - hostname: uptime.anthonychiappone.com
+    service: http://10.10.10.4:3001
+  - hostname: pulse.anthonychiappone.com
+    service: http://10.10.10.5:7655
   - service: http_status:404

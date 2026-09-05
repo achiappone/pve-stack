@@ -21,6 +21,12 @@ const SERVICES: ServiceEntry[] = [
     desc: "unused", lan: true },
   { ct: null, name: "Proxmox VE", url: "https://pve.anthonychiappone.com",
     desc: "stock PVE interface", host: true },
+  { ct: 103, name: "Beszel", url: "https://beszel.anthonychiappone.com",
+    desc: "lightweight host + container metrics" },
+  { ct: 104, name: "Uptime Kuma", url: "https://uptime.anthonychiappone.com",
+    desc: "uptime checks and alerting" },
+  { ct: 105, name: "Pulse", url: "https://pulse.anthonychiappone.com",
+    desc: "Proxmox VE / PBS monitoring" },
   { ct: null, name: "Atlas", url: "https://atlaspd.com/login", desc: "", external: true },
 ];
 

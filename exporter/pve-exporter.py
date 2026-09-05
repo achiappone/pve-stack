@@ -4,14 +4,23 @@
 Bound to vmbr1 (10.10.10.1) on purpose: that bridge has no physical port, so
 this is reachable only from containers attached to it and never from the LAN.
 
-Everything here is a read. There are no actions, so the worst a caller can do
-is learn the host's temperature.
+It also exposes a POST /action endpoint behind a fixed allowlist, which can
+fstrim, restart containers and reboot the host - so callers are restricted to
+EXPORTER_ALLOW (the ops dashboard), not merely to the bridge.
 """
 import glob, json, os, re, subprocess, threading, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 BIND = os.environ.get("EXPORTER_BIND", "10.10.10.1")
 PORT = int(os.environ.get("EXPORTER_PORT", "9101"))
+
+# vmbr1 membership used to be the whole access model - the bridge has no
+# physical port, and 102 was its only member. It is not the only member any
+# more: the monitoring containers sit there too so the tunnel can reach them
+# without putting them on the office LAN. Those are internet-facing apps, and
+# this endpoint reboots the hypervisor, so membership alone is no longer
+# enough. Only the ops dashboard may call it.
+ALLOW = set(filter(None, os.environ.get("EXPORTER_ALLOW", "10.10.10.2").split(",")))
 
 
 def read(p, d=None):
@@ -405,7 +414,18 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def allowed(self):
+        """Reject before reading the body, so an unknown peer cannot even
+        submit one. Checked on GET too: the metrics carry the host's whole
+        hardware inventory."""
+        if self.client_address[0] in ALLOW:
+            return True
+        self.send_error(403)
+        return False
+
     def do_POST(self):
+        if not self.allowed():
+            return
         if self.path != "/action":
             self.send_error(404)
             return
@@ -429,6 +449,8 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(out)
 
     def do_GET(self):
+        if not self.allowed():
+            return
         if self.path != "/metrics":
             self.send_error(404)
             return
