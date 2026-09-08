@@ -17,6 +17,7 @@ laptop that has already powered itself off unexpectedly once.
     systemd/                unit files for all three
     modprobe.d/             module options             fan control, usb-storage quirks
     udev/                   device rules               backup enclosure autosuspend
+    wifi/                   secondary path + failover  wifi-up/down, wifi-failover
 
 Monitoring lives in 103 (beszel), 104 (uptime-kuma) and 105 (pulse). Those are
 installed from upstream releases rather than from this repo, but each binds only
@@ -64,8 +65,25 @@ against `EXPORTER_ALLOW` (102 alone) rather than trusting the bridge.
   of files. `--disk-cache-size=1 --media-cache-size=1` cut allocation growth
   from ~4.2%/min to ~0.002%/min. A nightly `pct fstrim` is the backstop.
 * **The USB ethernet dongle re-enumerates** onto a different bus and comes back
-  *outside* `vmbr0`, killing the wired path with no error logged anywhere. The
-  wifi backup path exists for exactly this. `nic_rejoin` fixes it in one click.
+  *outside* `vmbr0`, killing the wired path with no error logged anywhere.
+  `nic_rejoin` fixes it in one click. The wifi backup path exists for exactly
+  this, but until 2026-09-08 it did not actually work: `wifi-up.sh` runs dhcpcd
+  with `-G`, so wifi had an address and no way out. That flag is still right -
+  wifi must not carry traffic in normal operation - so the failover is active
+  instead. `wifi-failover.timer` probes the wired gateway every 30s and swaps
+  the default route when it stops answering.
+
+  A route metric would not have done it. `vmbr0` is a bridge and stays UP when
+  its only physical port vanishes, so the kernel never withdraws the wired
+  default and traffic blackholes rather than failing over. Something has to
+  probe. If the wired path is down *and* wifi has no gateway in its lease, the
+  script changes nothing rather than stranding a host with no remote hands;
+  `wifi-failover.selfcheck.sh` covers that branch.
+
+  This moves the **host** off the dead uplink. It does not save the tunnel: the
+  containers gateway via the LAN router, not via the host, so cloudflared in 102
+  still goes down with the wired path. A cloudflared on the host is the piece
+  that would fix that, and it is not built yet.
 * **The camera needs a real browser.** aiortc gets ICE working after the
   printer's malformed SDP is sanitised, but DTLS never completes - the
   printer's `pear` stack ignores the ClientHello. Headless Chromium negotiates
