@@ -18,6 +18,7 @@ laptop that has already powered itself off unexpectedly once.
     modprobe.d/             module options             fan control, usb-storage quirks
     udev/                   device rules               backup enclosure autosuspend
     wifi/                   secondary path + failover  wifi-up/down, wifi-failover
+    net/                    NIC auto-rejoin            nic-rejoin + self-check
 
 Monitoring lives in 103 (beszel), 104 (uptime-kuma) and 105 (pulse). Those are
 installed from upstream releases rather than from this repo, but each binds only
@@ -80,10 +81,25 @@ against `EXPORTER_ALLOW` (102 alone) rather than trusting the bridge.
   script changes nothing rather than stranding a host with no remote hands;
   `wifi-failover.selfcheck.sh` covers that branch.
 
-  This moves the **host** off the dead uplink. It does not save the tunnel: the
-  containers gateway via the LAN router, not via the host, so cloudflared in 102
-  still goes down with the wired path. A cloudflared on the host is the piece
-  that would fix that, and it is not built yet.
+  That moves the **host** off the dead uplink, which on its own saves nothing:
+  the containers gateway via the LAN router rather than via the host, so
+  cloudflared in 102 goes down with the wired path regardless. The piece that
+  closes it is a *second* cloudflared running on the host itself
+  (`cloudflared/host.yml`, tunnel `pve-host`, hostname
+  `pve-direct.anthonychiappone.com`). It uses the host's routing table, so it
+  follows the failover onto wifi. Verified end to end on 2026-09-08: with the
+  default route forced onto `wlp59s0`, an ssh to `pve-direct` still lands.
+
+  It reaches the host only, not the containers - but the host is where `nic0`
+  gets fixed from, so that is the one that matters.
+
+* **The USB NIC comes back outside the bridge, and nothing put it back.** The
+  Alpine Ridge controller `0000:3a:00.0` removes itself and takes every device
+  on it with it - 26 times in six days. The devices re-enumerate within about
+  two seconds; the NIC just does not rejoin `vmbr0`. That one missing step took
+  the box off the network for half an hour on 2026-09-08 and needed someone at
+  the console. `udev/99-nic-rejoin.rules` now fires the moment the interface
+  appears, with `nic-rejoin.timer` as a backstop for the cases udev cannot see.
 * **The camera needs a real browser.** aiortc gets ICE working after the
   printer's malformed SDP is sanitised, but DTLS never completes - the
   printer's `pear` stack ignores the ClientHello. Headless Chromium negotiates
