@@ -15,6 +15,19 @@ laptop that has already powered itself off unexpectedly once.
     camera/camrelay.py      WebRTC -> MJPEG relay      container 101
     deploy/                 deploy + maintenance       k2-deploy, k2-set-smtp, fstrim cron
     systemd/                unit files for all three
+    modprobe.d/             module options             fan control, usb-storage quirks
+    udev/                   device rules               backup enclosure autosuspend
+
+Monitoring lives in 103 (beszel), 104 (uptime-kuma) and 105 (pulse). Those are
+installed from upstream releases rather than from this repo, but each binds only
+its vmbr1 address, so the ops tunnel is the one way in and nothing of theirs is
+on the office LAN.
+
+Backups go to a USB disk mounted at `/mnt/backup`, registered as the
+`backup-usb` storage with `is_mountpoint 1` - without that flag a run while the
+disk is unmounted writes into the empty directory and fills the root
+filesystem. The fstab entry is `nofail`: this host has no remote hands, and a
+USB disk that fails to appear must never hold up boot.
 
 The K2 printer dashboard itself lives in its own repo,
 `github.com/achiappone/k2plus-dashboard`, and is deployed by `deploy/k2-deploy`.
@@ -40,8 +53,10 @@ cannot answer:
 
 **The exporter listens on `vmbr1` (10.10.10.1)**, a bridge with no physical
 port, so it is unreachable from the LAN. It runs as root and can execute a
-fixed allowlist of actions, so treat anything attached to `vmbr1` as trusted:
-container 102 is currently the only member.
+fixed allowlist of actions. Bridge membership used to be the whole access
+model, back when 102 was the only member; the monitoring containers sit there
+too now, and those are internet-facing, so the exporter checks the peer address
+against `EXPORTER_ALLOW` (102 alone) rather than trusting the bridge.
 
 ## Hard-won details
 
@@ -57,6 +72,16 @@ container 102 is currently the only member.
   fine, so the relay drives one and re-serves MJPEG.
 * **Cloudflare replaces origin 5xx** with its own error page, swallowing the
   body. Return 4xx for anything whose message the UI needs to show.
+* **The USB backup drive needs two fixes, not one.** The JMicron 152d:0578
+  bridge dropped off the bus mid-transfer in sessions that got shorter each
+  time, always ending `Synchronize Cache(10) failed: hostbyte=DID_ERROR`.
+  `usb-storage quirks=152d:0578:u` takes it off UAS, and that alone still died
+  about 4G into an 8G read - it also has to be kept out of runtime autosuspend,
+  which is what `udev/99-backup-enclosure.rules` does. It draws 896mA of a
+  900mA SuperSpeed budget, so there is no headroom to survive a suspend/resume
+  mid-transfer. With both applied: 8G read at 107 MB/s, 6G write at 80 MB/s,
+  zero disconnects. The drive itself was never at fault - SMART passes with
+  zero reallocated, pending and CRC counts.
 
 ## Versioning
 
