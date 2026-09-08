@@ -1,0 +1,26 @@
+tunnel: 182abd1d-0159-4e5b-961d-450221598321
+# Referenced where `cloudflared tunnel create` already wrote it, rather than
+# copied into /etc/cloudflared - one fewer place the secret exists.
+credentials-file: /root/.cloudflared/182abd1d-0159-4e5b-961d-450221598321.json
+
+# This one runs on the HOST, not in a container, and that is the entire point.
+#
+# pve-ssh.* goes through the tunnel in CT 102, and CT 102 reaches the internet
+# via vmbr0 -> nic0 -> the LAN router, exactly like every other container. It
+# does not route through the host. So when the USB NIC drops, that tunnel dies
+# with it and there is no way in at all - which is what happened on 2026-09-08
+# and cost half an hour of someone typing at the physical console.
+#
+# cloudflared here uses the HOST's routing table, and wifi-failover.timer moves
+# that to wlp59s0 when the wired gateway stops answering. Wired dies -> host
+# swings to wifi -> this tunnel reconnects over wifi -> the box is still
+# reachable. It reaches only the host, not the containers, but the host is where
+# nic0 gets fixed from, so that is the one that matters.
+#
+# Deliberately a separate tunnel from ops. The same tunnel run from two places
+# is an HA pair that load-balances between them, and these two have different
+# ingress rules - requests would land on whichever answered first.
+ingress:
+  - hostname: pve-direct.anthonychiappone.com
+    service: ssh://localhost:22
+  - service: http_status:404
