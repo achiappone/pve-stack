@@ -11,20 +11,15 @@ credentials-file: /etc/cloudflared/9c320e89-1beb-4267-98e1-95b8f07d0383.json
 # open SSH endpoint on a hypervisor.
 # (ssh.anthonychiappone.com was already taken by an unrelated record.)
 #
-# The same applies to pve.* below, more so: it is the hypervisor's root login
-# page. Every hostname here must sit behind a Cloudflare Access policy.
+# pve.* used to be served from here too. It moved to the host's own tunnel
+# (cloudflared/host.yml): it is the host's service, and serving it from a
+# container meant it died whenever the container did. Every hostname here still
+# must sit behind a Cloudflare Access policy.
 ingress:
   - hostname: ops.anthonychiappone.com
     service: http://localhost:8780
   - hostname: pve-ssh.anthonychiappone.com
     service: ssh://10.20.1.43:22
-  # The stock PVE web UI, also on the HOST. Its certificate is the node's own
-  # self-signed one, so the tunnel has to skip verification on the last hop -
-  # that hop is a bridge-local TCP connection, not the internet.
-  - hostname: pve.anthonychiappone.com
-    service: https://10.20.1.43:8006
-    originRequest:
-      noTLSVerify: true
   # The monitoring stack in 103/104/105. Each binds only its vmbr1 address, so
   # this tunnel is the single way in - nothing of theirs is on the office LAN.
   - hostname: beszel.anthonychiappone.com

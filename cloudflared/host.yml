@@ -21,6 +21,18 @@ credentials-file: /root/.cloudflared/182abd1d-0159-4e5b-961d-450221598321.json
 # is an HA pair that load-balances between them, and these two have different
 # ingress rules - requests would land on whichever answered first.
 ingress:
+  # SSH only - there is no web service behind this one, so a browser pointed at
+  # it gets nothing to render. Use `ssh pve-direct`.
   - hostname: pve-direct.anthonychiappone.com
     service: ssh://localhost:22
+
+  # The PVE web UI, moved here from the CT 102 tunnel. It was always the host's
+  # own service; serving it from the host's own tunnel means it survives CT 102
+  # dying and follows the wifi failover, which is the whole point. localhost
+  # rather than 10.20.1.43 so it does not depend on the bridge either.
+  - hostname: pve.anthonychiappone.com
+    service: https://localhost:8006
+    originRequest:
+      noTLSVerify: true
+
   - service: http_status:404
