@@ -15,7 +15,7 @@
     "health": "tsx dev/run.ts health",
     "logs:ops": "tsx dev/run.ts logs:ops",
     "logs:camera": "tsx dev/run.ts logs:camera",
-    "logs:printer": "tsx dev/run.ts logs:printer",npm
+    "logs:printer": "tsx dev/run.ts logs:printer",
     "logs:exporter": "tsx dev/run.ts logs:exporter",
     "logs:deploy": "tsx dev/run.ts logs:deploy",
     "metrics": "tsx dev/run.ts metrics",

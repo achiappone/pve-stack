@@ -26,7 +26,7 @@ run() { if [ "$DRY_RUN" = 1 ]; then echo "WOULD: $*"; else "$@"; fi; }
 
 # Overridable so the self-check can drive both branches without real hardware.
 wired_ok() {
-  if [ -n "${FAKE_WIRED:-}" ]; then [ "$FAKE_WIRED" = ok ]; return; fi
+  if [ -n "${FAKE_WIRED+x}" ]; then [ "$FAKE_WIRED" = ok ]; return; fi
   local i
   for i in $(seq 1 "$TRIES"); do
     ping -c1 -W2 -I "$LAN_IF" "$LAN_GW" >/dev/null 2>&1 && return 0
@@ -39,7 +39,11 @@ wired_ok() {
 # moves between networks, and a stale hardcoded address would fail over to
 # nowhere.
 wifi_gw() {
-  if [ -n "${FAKE_WIFI_GW:-}" ]; then echo "$FAKE_WIFI_GW"; return; fi
+  # Tested for being SET, not for being non-empty. "set but empty" is exactly
+  # the case the self-check needs to simulate - a lease with no gateway - and a
+  # -n test would fall through to the real dhcpcd instead, which on the host
+  # answers with a live gateway and silently turns that check into a no-op.
+  if [ -n "${FAKE_WIFI_GW+x}" ]; then echo "$FAKE_WIFI_GW"; return; fi
   dhcpcd -U "$WIFI_IF" 2>/dev/null | sed -n 's/^routers=//p' | awk '{print $1}'
 }
 
