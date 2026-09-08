@@ -183,8 +183,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // Clamped, not trusted: this number sizes a read loop, and NaN would make
     // the cutoff NaN and quietly return nothing.
     const raw = Number(new URL(url, "http://x").searchParams.get("hours"));
+    // Floor is 0.25h, not 1h: the Range dropdown offers 30 minutes, and a
+    // minimum of 1 silently widened it back to an hour.
     const hours = Number.isFinite(raw)
-      ? Math.min(Math.max(raw, 1), config.historyDays * 24)
+      ? Math.min(Math.max(raw, 0.25), config.historyDays * 24)
       : 6;
     return sendJson(res, 200, readHistory(hours));
   }
