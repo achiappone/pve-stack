@@ -9,3 +9,10 @@
 # a suspend/resume cycle mid-transfer. Nothing else on this host needs the same
 # treatment - the rule is deliberately keyed to this one vid:pid.
 ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="152d", ATTR{idProduct}=="0578", TEST=="power/control", ATTR{power/control}="on"
+
+# And stop it spinning down. Every spin-down means another spin-up later, and
+# spin-up is the largest current draw a 2.5" disk makes - the moment most likely
+# to brown out a bus-powered enclosure that already asks for 896 of 900mA. APM
+# is off on this drive by default; the standby timer is not, so it gets set
+# explicitly. Costs a little idle power, avoids repeatedly hitting the ceiling.
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="sd[a-z]", ENV{ID_VENDOR_ID}=="152d", ENV{ID_MODEL_ID}=="0578", RUN+="/usr/sbin/hdparm -B 255 -S 0 /dev/%k"
