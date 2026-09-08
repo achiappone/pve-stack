@@ -1,0 +1,11 @@
+# Keep the backup enclosure out of USB runtime autosuspend.
+#
+# The JMicron 152d:0578 needs two things to stay on the bus under load, and the
+# UAS quirk in modprobe.d is only the first. With autosuspend left at "auto" an
+# 8G read still died after ~4G with the device dropping off; with it off the
+# same read completes at 107 MB/s and zero disconnects.
+#
+# It draws 896mA of a 900mA SuperSpeed budget, so it has no headroom to ride out
+# a suspend/resume cycle mid-transfer. Nothing else on this host needs the same
+# treatment - the rule is deliberately keyed to this one vid:pid.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="152d", ATTR{idProduct}=="0578", TEST=="power/control", ATTR{power/control}="on"

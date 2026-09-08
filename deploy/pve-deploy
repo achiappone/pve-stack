@@ -88,6 +88,15 @@ for f in "$REPO"/modprobe.d/*.conf; do
     && echo "ok: modprobe.d/$(basename "$f") (takes effect on module reload or reboot)"
 done
 
+# udev rules apply on the next device event, so unlike modprobe.d these do not
+# need a reboot - only a replug.
+for f in "$REPO"/udev/*.rules; do
+  [ -f "$f" ] || continue
+  install -m644 "$f" "/etc/udev/rules.d/$(basename "$f")" \
+    && echo "ok: udev/$(basename "$f")"
+done
+udevadm control --reload-rules 2>/dev/null || true
+
 install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"
 install -m644 "$REPO/systemd/pve-exporter.service" /etc/systemd/system/pve-exporter.service
 systemctl daemon-reload
