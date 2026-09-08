@@ -99,18 +99,26 @@ udevadm control --reload-rules 2>/dev/null || true
 
 # Wifi management path and its failover. These lived only on the host until
 # now, which is the exact problem this repo exists to fix.
+for f in "$REPO"/net/*.sh; do
+  [ -f "$f" ] || continue
+  install -m755 "$f" "/usr/local/sbin/$(basename "$f")" \
+    && echo "ok: $(basename "$f")"
+done
 for f in "$REPO"/wifi/*.sh; do
   [ -f "$f" ] || continue
   install -m755 "$f" "/usr/local/sbin/$(basename "$f")" \
     && echo "ok: $(basename "$f")"
 done
-for u in wifi-backup.service wifi-failover.service wifi-failover.timer; do
+for u in wifi-backup.service wifi-failover.service wifi-failover.timer \
+         nic-rejoin.service nic-rejoin.timer; do
   [ -f "$REPO/systemd/$u" ] || continue
   install -m644 "$REPO/systemd/$u" "/etc/systemd/system/$u" && echo "ok: $u"
 done
 systemctl daemon-reload
 systemctl enable --now wifi-failover.timer >/dev/null 2>&1 \
   && echo "ok: wifi-failover.timer armed"
+systemctl enable --now nic-rejoin.timer >/dev/null 2>&1 \
+  && echo "ok: nic-rejoin.timer armed"
 
 install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"
 install -m644 "$REPO/systemd/pve-exporter.service" /etc/systemd/system/pve-exporter.service

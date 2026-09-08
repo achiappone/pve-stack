@@ -1,0 +1,14 @@
+[Unit]
+Description=Backstop check that the USB NIC is still a member of vmbr0
+
+[Timer]
+# The udev rule handles re-enumeration, which is the common case and is
+# instant. This exists for what udev cannot see: a port that went quiet without
+# an add event, or a controller that removed itself and never came back. 20s
+# because every second here is a second of no containers and no tunnels.
+OnBootSec=60s
+OnUnitActiveSec=20s
+AccuracySec=2s
+
+[Install]
+WantedBy=timers.target

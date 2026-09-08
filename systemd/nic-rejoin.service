@@ -1,0 +1,7 @@
+[Unit]
+Description=Put the USB NIC back into vmbr0 after it re-enumerates
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nic-rejoin.sh

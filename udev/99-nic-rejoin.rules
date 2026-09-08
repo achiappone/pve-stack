@@ -1,0 +1,11 @@
+# The instant the USB NIC reappears, put it back into vmbr0.
+#
+# Matched on MAC rather than interface name: the name is itself assigned by a
+# .link file (50-pmx-nic0.link) keyed to the same MAC, and at the moment this
+# rule fires the rename may not have happened yet - the kernel log shows it as
+# "(unnamed net_device) (uninitialized)".
+#
+# Starts a unit rather than running the script directly. udev kills long-running
+# RUN+= processes and runs them in a restricted environment; handing off to
+# systemd with --no-block avoids both problems.
+ACTION=="add", SUBSYSTEM=="net", ATTR{address}=="c8:f7:50:92:cd:70", RUN+="/usr/bin/systemctl --no-block restart nic-rejoin.service"
