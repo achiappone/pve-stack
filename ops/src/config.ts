@@ -41,7 +41,12 @@ export const config = {
   // slower than the page's 5s tick: at 5s this writes 17k lines a day to an
   // SSD whose wearout this same dashboard reports. 30s is ~2900 lines.
   stateDir: pick("OPS_STATE_DIR", "/var/lib/pve-ops"),
-  historySeconds: Number(pick("OPS_HISTORY_SECONDS", "30")),
+  // 10s, not 30s: the Range dropdown's 30 minute view is 180 samples at this
+  // rate, which is under MAX_POINTS, so that view is drawn at full resolution
+  // with nothing thinned away. Longer ranges still bucket down to 240 points,
+  // so the chart costs the same to draw as it always did - only the on-disk
+  // history grows, to roughly 60k lines a week.
+  historySeconds: Number(pick("OPS_HISTORY_SECONDS", "10")),
   historyDays: Number(pick("OPS_HISTORY_DAYS", "7")),
 } as const;
 

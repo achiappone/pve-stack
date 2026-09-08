@@ -212,9 +212,9 @@ export function prune(t = now()): void {
 
 /** Read back the last `hours` of samples, thinned to at most MAX_POINTS.
  *
- *  Deliberately uncached. Seven days is ~20k lines and parses in tens of
- *  milliseconds, and this is only called when someone changes the range
- *  dropdown - a cache here would be state to invalidate for no gain. */
+ *  Deliberately uncached. Seven days is ~60k lines at a 10s sample rate and
+ *  parses in well under a second, and this is only called when someone changes
+ *  the range dropdown - a cache here would be state to invalidate for no gain. */
 export function readHistory(hours: number, t = now()): Sample[] {
   const cutoff = t - hours * 3600;
   const from = day(cutoff);
