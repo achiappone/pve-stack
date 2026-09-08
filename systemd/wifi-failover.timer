@@ -1,0 +1,14 @@
+[Unit]
+Description=Check the wired gateway and fail over to wifi if it is down
+
+[Timer]
+# 30s is a compromise: the probe itself takes up to 3 seconds when the wired
+# path is dead, and failing over faster than the USB NIC can re-enumerate would
+# just flap. Nothing here needs sub-minute recovery - it exists so the host is
+# still reachable at all, not so a download survives.
+OnBootSec=90s
+OnUnitActiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

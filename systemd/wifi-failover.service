@@ -1,0 +1,8 @@
+[Unit]
+Description=Move the default route to wifi while the wired gateway is down
+After=network-online.target wifi-backup.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/wifi-failover.sh
