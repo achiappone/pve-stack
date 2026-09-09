@@ -43,4 +43,17 @@ ingress:
   - hostname: ops-direct.anthonychiappone.com
     service: http://10.10.10.2:8780
 
+  # The K2 printer's Fluidd UI. Served from the host because the host sits on
+  # the same wifi subnet as the printer (10.20.5.x) and can reach it directly -
+  # so nothing has to be installed on the printer, and nothing here is lost when
+  # Creality ships a firmware update.
+  #
+  # DANGEROUS WITHOUT ACCESS. Moonraker behind this has no authentication of any
+  # kind: /server/info, print state and the file list all answer unauthenticated.
+  # Anyone reaching this hostname can upload and run gcode, move the axes and set
+  # the hotend temperature. This must sit behind a Cloudflare Access policy
+  # before its DNS record is created, not after.
+  - hostname: k2-printer.anthonychiappone.com
+    service: http://10.20.5.28:4408
+
   - service: http_status:404
