@@ -129,6 +129,11 @@ export interface ServiceEntry {
   host?: boolean;
   external?: boolean;
   self?: boolean;
+  /** Reachable by ssh, not by browser. Rendered as plain text rather than a
+   *  link - clicking an ssh:// ingress rule gets you a blank page, which has
+   *  cost enough confusion already. The probe still runs: a 200 from the edge
+   *  means the tunnel is up, which is the thing worth knowing. */
+  ssh?: boolean;
 }
 
 export interface ProbeResult {

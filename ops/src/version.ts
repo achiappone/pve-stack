@@ -8,4 +8,4 @@
  *  Single source of truth. The server substitutes it into the page and reports
  *  it on /api/snapshot, so "is what I am looking at the code I just deployed?"
  *  has an answer that does not require an ssh session. */
-export const VERSION = "1.04.003";
+export const VERSION = "1.05.001";

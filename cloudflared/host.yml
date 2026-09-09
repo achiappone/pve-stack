@@ -35,4 +35,12 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # A second route to the Dev-Ops dashboard. pve-ops lives in CT 102, but this
+  # reaches it across vmbr1 - a bridge with no physical port, so it keeps
+  # working when nic0 dies and CT 102 loses the LAN. ops.* goes through CT 102's
+  # own tunnel and dies with it; on 2026-09-09 that left the dashboard dark for
+  # four hours while the host itself was reachable the whole time.
+  - hostname: ops-direct.anthonychiappone.com
+    service: http://10.10.10.2:8780
+
   - service: http_status:404

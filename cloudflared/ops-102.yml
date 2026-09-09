@@ -16,8 +16,11 @@ credentials-file: /etc/cloudflared/9c320e89-1beb-4267-98e1-95b8f07d0383.json
 # container meant it died whenever the container did. Every hostname here still
 # must sit behind a Cloudflare Access policy.
 ingress:
+  # 10.10.10.2, not localhost: pve-ops binds its vmbr1 address so the host's
+  # tunnel can reach it too, which is what gives the dashboard a second route.
+  # vmbr1 is host-only, so this is no more exposed than loopback was.
   - hostname: ops.anthonychiappone.com
-    service: http://localhost:8780
+    service: http://10.10.10.2:8780
   - hostname: pve-ssh.anthonychiappone.com
     service: ssh://10.20.1.43:22
   # The monitoring stack in 103/104/105. Each binds only its vmbr1 address, so

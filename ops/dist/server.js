@@ -16,6 +16,19 @@ const SERVICES = [
         desc: "unused", lan: true },
     { ct: null, name: "Proxmox VE", url: "https://pve.anthonychiappone.com",
         desc: "stock PVE interface", host: true },
+    // The lifeline. Worth a row not because you click it, but because this is
+    // where you find out it still works - on the day the wired path dies, this
+    // is the only way in, and by then it is too late to discover it is broken.
+    { ct: null, name: "Host SSH (lifeline)", url: "https://pve-direct.anthonychiappone.com",
+        desc: "ssh pve-direct - host tunnel, survives a NIC failure via wifi",
+        host: true, ssh: true },
+    // Same dashboard, second route. This one is published by the tunnel on the
+    // HOST and reaches pve-ops across vmbr1, which has no physical port and so
+    // keeps working when nic0 dies. ops.* goes through CT 102's own tunnel and
+    // does not - on 2026-09-09 it was unreachable for four hours while the host
+    // was fine.
+    { ct: 102, name: "Dev-Ops (wifi route)", url: "https://ops-direct.anthonychiappone.com",
+        desc: "this page again, via the host tunnel - up when ops.* is not" },
     { ct: 103, name: "Beszel", url: "https://beszel.anthonychiappone.com",
         desc: "lightweight host + container metrics" },
     { ct: 104, name: "Uptime Kuma", url: "https://uptime.anthonychiappone.com",
