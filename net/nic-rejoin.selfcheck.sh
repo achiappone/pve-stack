@@ -53,5 +53,24 @@ refute "nic absent -> does NOT try to add a device that is not there" "ip link s
 check "in bridge but gateway dead -> bounces the link" "WOULD: ip link set nic0 down" \
   env DRY_RUN=1 FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=yes FAKE_GW_OK=no bash "$SUT"
 
+C=$(mktemp -u /tmp/nic-rejoin-selfcheck.XXXXXX)
+
+rm -f "$C"
+refute "absent, first check -> rescans but does NOT rebind yet" "unbind" \
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+
+echo 2 > "$C"
+check "absent, third check -> escalates to a controller rebind" "unbind" \
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+
+echo 9 > "$C"
+refute "nic ALIVE -> never rebinds the controller, whatever the counter says" "unbind" \
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+
+echo 9 > "$C"
+check "nic back -> clears the escalation counter" "rm -f" \
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+rm -f "$C"
+
 echo
 if [ "$fails" -eq 0 ]; then echo "all checks passed"; else echo "$fails check(s) failed"; exit 1; fi
