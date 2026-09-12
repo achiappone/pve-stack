@@ -9,6 +9,14 @@ EnvironmentFile=/etc/k2-dashboard.env
 ExecStart=/opt/camrelay-venv/bin/python /opt/camrelay.py
 Restart=on-failure
 RestartSec=5
+
+# The container gets 2 cores (cores: 2) and Chromium will take both of them to
+# decode the printer's 1080p stream - that is what put the host at 98 C with the
+# fans already maxed. One core is the ceiling; the stream is grabbed at 4 fps so
+# a decoder that falls behind costs smoothness, not frames. Raise it if the
+# picture stutters more than you can live with, and watch the package temp.
+CPUQuota=100%
+Nice=10
 NoNewPrivileges=true
 PrivateTmp=true
 
