@@ -67,8 +67,14 @@ def touch():
 GRAB_JS = """(q) => {
   const v = document.getElementById('remoteVideos');
   if (!v || v.readyState < 2 || !v.videoWidth) return null;
-  const c = document.createElement('canvas');
-  c.width = v.videoWidth; c.height = v.videoHeight;
+  // Cached on window deliberately. A fresh canvas per frame is an 8 MB backing
+  // store four times a second, and the collector did not keep up: 1.9 G peak
+  // and an oom-kill about 25 minutes into a session.
+  let c = window.__grab;
+  if (!c || c.width !== v.videoWidth || c.height !== v.videoHeight) {
+    c = window.__grab = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+  }
   c.getContext('2d').drawImage(v, 0, 0);
   return c.toDataURL('image/jpeg', q);
 }"""
@@ -93,15 +99,27 @@ video{width:100vw;height:100vh;object-fit:contain}</style>
 <script>
 const SIGNAL = "__SIGNAL__";
 function say(s){ console.log("cam: " + s); }
-let pc = null;
+// On window so the relay can hang up from page.evaluate before it kills the
+// browser. Dropping a session without closing it leaves the printer holding a
+// peer that will never answer: it retransmits the DTLS handshake at it on a
+// widening backoff, and sessions opened afterwards get no media. One orphan is
+// enough to take the camera out until webrtc_local is restarted - which is what
+// an oom-kill left behind on 2026-09-11.
+var pc = null;
+addEventListener("pagehide", () => { try{ pc && pc.close(); }catch(e){} });
 function connect(){
   if(pc){ try{ pc.close(); }catch(e){} }
-  pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+  // No STUN. The dashboard needed it because the browser was yours, out on the
+  // internet behind NAT. This browser runs beside the printer, so host
+  // candidates already describe a working path - and waiting for a gather
+  // against stun.l.google.com to time out burned 40 of the 45 seconds the
+  // capture loop allows, so the video started just after we gave up on it.
+  pc = new RTCPeerConnection({iceServers:[]});
   pc.ontrack = e => { document.getElementById("remoteVideos").srcObject = e.streams[0];
                       say("track"); };
   pc.oniceconnectionstatechange = () => say("ice " + pc.iceConnectionState);
   pc.onicecandidate = ev => {
-    if(ev.candidate !== null) return;
+    if(ev.candidate !== null){ say("candidate " + ev.candidate.candidate); return; }
     fetch(SIGNAL, {method:"POST", headers:{"Content-Type":"text/plain"},
                    body: btoa(JSON.stringify({type:"offer", sdp:pc.localDescription.sdp}))})
       .then(r => r.text())
@@ -136,13 +154,21 @@ async def pump():
     async with async_playwright() as pw:
         while True:
             await demand.wait()
-            browser = None
+            browser = page = None
             failed = False
             try:
                 browser = await pw.chromium.launch(args=[
                     "--no-sandbox",                        # unprivileged LXC
                     "--disable-dev-shm-usage",             # /dev/shm is tiny here
                     "--autoplay-policy=no-user-gesture-required",
+                    # Chromium publishes host candidates as obfuscated mDNS
+                    # names (a1b2....local) unless told not to. A browser peer
+                    # resolves those; the printer's minimal stack cannot, so it
+                    # has no address to send to - it sits in CONNECTING and
+                    # retransmits the DTLS handshake into nowhere while our side
+                    # cheerfully reports ice connected. Both ends are on the LAN
+                    # and the relay is not a privacy boundary.
+                    "--disable-features=WebRtcHideLocalIpsWithMdns",
                     # Chromium's caches churn hard while decoding a continuous
                     # 1080p stream. The files never grow - they are written and
                     # deleted - but on LVM-thin every write claims fresh blocks
@@ -183,6 +209,12 @@ async def pump():
                 log.warning("relay cycle failed: %s", e)
             finally:
                 if browser:
+                    try:
+                        # Hang up first, so the printer frees the slot instead of
+                        # retransmitting DTLS at a peer that is already gone.
+                        await page.evaluate("() => { try{ pc && pc.close(); }catch(e){} }")
+                    except Exception:
+                        pass
                     try:
                         await browser.close()
                     except Exception:
