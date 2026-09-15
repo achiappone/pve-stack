@@ -31,4 +31,15 @@ ingress:
     service: http://10.10.10.4:3001
   - hostname: pulse.anthonychiappone.com
     service: http://10.10.10.5:7655
+  # The haze regulator on the DMX rig. Unlike everything else in this file the
+  # origin sits on the office LAN, not vmbr1 - it is an ESP32 on wifi and there
+  # is no host-only path to it. So this is the one hostname here whose origin is
+  # reachable without the tunnel, which makes the Access policy load-bearing
+  # rather than belt-and-braces: the firmware serves /update, an unauthenticated
+  # firmware upload, and it drives a hazer.
+  #
+  # 10.20.5.52 is a DHCP lease, not a reservation. If the board moves this
+  # breaks, and mDNS is filtered on the office wifi so haze.local is no fallback.
+  - hostname: haze.anthonychiappone.com
+    service: http://10.20.5.52
   - service: http_status:404

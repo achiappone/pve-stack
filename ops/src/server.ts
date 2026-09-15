@@ -40,6 +40,13 @@ const SERVICES: ServiceEntry[] = [
     desc: "uptime checks and alerting" },
   { ct: 105, name: "Pulse", url: "https://pulse.anthonychiappone.com",
     desc: "Proxmox VE / PBS monitoring" },
+  // Not a container - an ESP32 on the DMX rig, reached across the office LAN
+  // rather than vmbr1. The probe row is the whole point of listing it: a bad
+  // self-test bricked this board on 2026-09-11 and it sat in a panic-reboot
+  // loop for four days, because a panic in setup() never reaches WiFi and so
+  // cannot be recovered over the air. Nothing was watching.
+  { ct: null, name: "Haze regulator", url: "https://haze.anthonychiappone.com",
+    desc: "PM2.5-regulated hazer - DMX output, live chart" },
   { ct: null, name: "Atlas", url: "https://atlaspd.com/login", desc: "", external: true },
 ];
 
