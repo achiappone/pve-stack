@@ -136,6 +136,8 @@ export interface ServiceEntry {
   ssh?: boolean;
   /** Render the live print summary on this row. */
   printer?: boolean;
+  /** Render the live haze summary on this row. */
+  haze?: boolean;
 }
 
 export interface ProbeResult {
@@ -159,11 +161,25 @@ export interface PrinterSummary {
   remainingSeconds?: number | null;
 }
 
+/** What the hazer is doing, from the four fields of /api/state that say it.
+ *  The board reports fifty; the rest belong on its own page, not on a row. */
+export interface HazeSummary {
+  /** ug/m3, the sensor reading the loop regulates against. */
+  pm25: number;
+  /** 0..100, the haze output it is currently calling for. */
+  output: number;
+  automatic: boolean;
+  stopped: boolean;
+  /** False when the PMS sensor stops answering - the reading is then stale. */
+  sensorOk: boolean;
+}
+
 export interface Snapshot {
   ok: true;
   errors: string[];
   services: ServiceEntry[];
   printer?: PrinterSummary;
+  haze?: HazeSummary;
   probes: Record<string, ProbeResult>;
   node?: NodeStatus;
   storage?: StorageEntry[];

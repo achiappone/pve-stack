@@ -93,6 +93,24 @@ export async function printerSummary() {
         remainingSeconds,
     };
 }
+/** What the haze regulator is doing. Same idea as printerSummary: the row
+ *  says whether it is hazing and at what, and its own page has the rest. */
+export async function hazeSummary() {
+    const auth = Buffer.from(`${config.hazeUser}:${config.hazePass}`).toString("base64");
+    const { status, body } = await jsonRequest(`${config.hazeUrl}/api/state`, {
+        headers: { Authorization: `Basic ${auth}` },
+        timeoutMs: 6_000,
+    });
+    if (status >= 400)
+        throw new Error(`haze ${status}`);
+    return {
+        pm25: body.pm25 ?? 0,
+        output: body.output ?? 0,
+        automatic: body.automatic === true,
+        stopped: body.stopped === true,
+        sensorOk: body.sensorOk !== false,
+    };
+}
 export async function probe(url) {
     const t0 = Date.now();
     try {

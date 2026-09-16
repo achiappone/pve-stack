@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, loginRequired } from "./config.js";
-import { pve, hostMetrics, hostAction, probe, printerSummary } from "./pve.js";
+import { pve, hostMetrics, hostAction, probe, printerSummary, hazeSummary } from "./pve.js";
 import { PAGE, LOGIN_HTML } from "./page.js";
 import { VERSION } from "./version.js";
 import { clearDowns, getDowns, readHistory, sampleLoop } from "./history.js";
@@ -29,19 +29,13 @@ const SERVICES = [
     // was fine.
     { ct: 102, name: "Dev-Ops (wifi route)", url: "https://ops-direct.anthonychiappone.com",
         desc: "this page again, via the host tunnel - up when ops.* is not" },
-    { ct: 103, name: "Beszel", url: "https://beszel.anthonychiappone.com",
-        desc: "lightweight host + container metrics" },
-    { ct: 104, name: "Uptime Kuma", url: "https://uptime.anthonychiappone.com",
-        desc: "uptime checks and alerting" },
-    { ct: 105, name: "Pulse", url: "https://pulse.anthonychiappone.com",
-        desc: "Proxmox VE / PBS monitoring" },
     // Not a container - an ESP32 on the DMX rig, reached across the office LAN
     // rather than vmbr1. The probe row is the whole point of listing it: a bad
     // self-test bricked this board on 2026-09-11 and it sat in a panic-reboot
     // loop for four days, because a panic in setup() never reaches WiFi and so
     // cannot be recovered over the air. Nothing was watching.
     { ct: null, name: "Haze regulator", url: "https://haze.anthonychiappone.com",
-        desc: "PM2.5-regulated hazer - DMX output, live chart" },
+        desc: "PM2.5-regulated hazer - DMX output, live chart", haze: true },
     { ct: null, name: "Atlas", url: "https://atlaspd.com/login", desc: "", external: true },
 ];
 /** Mirrored from the exporter's allowlist. The exporter is the security
@@ -97,6 +91,16 @@ async function snapshot() {
         ["printer", async () => {
                 try {
                     out.printer = await printerSummary();
+                }
+                catch { /* off or unreachable */ }
+            }],
+        // Same treatment as the printer: a hazer that is switched off is a normal
+        // state, not a line in the error banner twelve times a minute.
+        ["haze", async () => {
+                if (!config.hazeUser || !config.hazePass)
+                    return;
+                try {
+                    out.haze = await hazeSummary();
                 }
                 catch { /* off or unreachable */ }
             }],

@@ -1,7 +1,7 @@
 import { request as httpsRequest } from "node:https";
 import { request as httpRequest } from "node:http";
 import { config, exporterAction } from "./config.js";
-import type { HostMetrics, ActionBody, ActionResult, PrinterSummary } from "./types.js";
+import type { HazeSummary, HostMetrics, ActionBody, ActionResult, PrinterSummary } from "./types.js";
 
 /** node:https rather than fetch: the node presents its own CA, and disabling
  *  verification for one internal call needs an agent option that global fetch
@@ -120,6 +120,26 @@ export async function printerSummary(): Promise<PrinterSummary> {
     percent,
     filename: ps.filename || undefined,
     remainingSeconds,
+  };
+}
+
+/** What the haze regulator is doing. Same idea as printerSummary: the row
+ *  says whether it is hazing and at what, and its own page has the rest. */
+export async function hazeSummary(): Promise<HazeSummary> {
+  const auth = Buffer.from(`${config.hazeUser}:${config.hazePass}`).toString("base64");
+  const { status, body } = await jsonRequest<{
+    pm25?: number; output?: number; automatic?: boolean; stopped?: boolean; sensorOk?: boolean;
+  }>(`${config.hazeUrl}/api/state`, {
+    headers: { Authorization: `Basic ${auth}` },
+    timeoutMs: 6_000,
+  });
+  if (status >= 400) throw new Error(`haze ${status}`);
+  return {
+    pm25: body.pm25 ?? 0,
+    output: body.output ?? 0,
+    automatic: body.automatic === true,
+    stopped: body.stopped === true,
+    sensorOk: body.sensorOk !== false,
   };
 }
 
