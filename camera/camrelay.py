@@ -50,7 +50,8 @@ IDLE_S   = float(os.environ.get("CAM_IDLE_S", "60"))
 FIRST_FRAME_S = float(os.environ.get("CAM_FIRST_FRAME_S", "90"))
 
 log = logging.getLogger("camrelay")
-latest = {"jpeg": None, "ts": 0.0, "frames": 0, "size": None}
+latest = {"jpeg": None, "ts": 0.0, "frames": 0, "size": None,
+          "fps": 0.0, "w": None, "h": None}
 
 # Demand, not a schedule: any request sets it, and the pump clears it once the
 # last viewer has been gone for IDLE_S. Nobody on the dashboard -> no browser.
@@ -80,7 +81,8 @@ GRAB_JS = """(q) => {
   // liveness signal here. A <video> keeps its last decoded frame forever after
   // the peer goes away, so the canvas still yields a perfectly valid JPEG of a
   // picture that stopped being true minutes ago.
-  return {url: c.toDataURL('image/jpeg', q), t: v.currentTime};
+  return {url: c.toDataURL('image/jpeg', q), t: v.currentTime,
+          w: v.videoWidth, h: v.videoHeight};
 }"""
 
 LIVE_JS = ("() => { const v = document.getElementById('remoteVideos');"
@@ -193,6 +195,10 @@ async def pump():
                 log.info("video is live, capturing at %.1f fps", FPS)
                 stale = 0
                 last_t = -1.0
+                # A new session is a new rate. Carrying the old average across a
+                # reconnect would report a healthy number for a stream that has
+                # only just come back.
+                latest["fps"] = 0.0
                 while True:
                     if not watch["viewers"] and time.time() - watch["touched"] > IDLE_S:
                         demand.clear()
@@ -208,8 +214,20 @@ async def pump():
                     # canvas never stopped producing a valid JPEG.
                     if url and t is not None and t != last_t:
                         last_t = t
+                        # Measured, not the configured FPS: the two differ
+                        # whenever the grab loop cannot keep up, and the
+                        # configured number would hide exactly that. Smoothed,
+                        # because a single slow frame is not a rate.
+                        now = time.time()
+                        if latest["ts"]:
+                            dt = now - latest["ts"]
+                            if dt > 0:
+                                inst = 1.0 / dt
+                                latest["fps"] = (inst if not latest["fps"]
+                                                 else latest["fps"] * 0.8 + inst * 0.2)
                         latest["jpeg"] = base64.b64decode(url.split(",", 1)[1])
-                        latest["ts"] = time.time()
+                        latest["ts"] = now
+                        latest["w"], latest["h"] = got.get("w"), got.get("h")
                         latest["frames"] += 1
                         stale = 0
                     else:
@@ -301,7 +319,11 @@ async def h_health(request):
         "frames": latest["frames"],
         "have_frame": latest["jpeg"] is not None,
         "bytes": len(latest["jpeg"]) if latest["jpeg"] else 0,
-        "last_frame_age_s": round(time.time() - latest["ts"], 2) if latest["ts"] else None})
+        "last_frame_age_s": round(time.time() - latest["ts"], 2) if latest["ts"] else None,
+        "fps": round(latest["fps"], 1) if latest["fps"] else None,
+        "fps_target": FPS,
+        "width": latest["w"],
+        "height": latest["h"]})
 
 
 async def main():
