@@ -76,7 +76,11 @@ GRAB_JS = """(q) => {
     c.width = v.videoWidth; c.height = v.videoHeight;
   }
   c.getContext('2d').drawImage(v, 0, 0);
-  return c.toDataURL('image/jpeg', q);
+  // currentTime comes back with the frame because it is the only honest
+  // liveness signal here. A <video> keeps its last decoded frame forever after
+  // the peer goes away, so the canvas still yields a perfectly valid JPEG of a
+  // picture that stopped being true minutes ago.
+  return {url: c.toDataURL('image/jpeg', q), t: v.currentTime};
 }"""
 
 LIVE_JS = ("() => { const v = document.getElementById('remoteVideos');"
@@ -188,20 +192,29 @@ async def pump():
                 fails = 0
                 log.info("video is live, capturing at %.1f fps", FPS)
                 stale = 0
+                last_t = -1.0
                 while True:
                     if not watch["viewers"] and time.time() - watch["touched"] > IDLE_S:
                         demand.clear()
                         log.info("nobody watching for %.0fs, closing the browser", IDLE_S)
                         break
-                    url = await page.evaluate(GRAB_JS, QUALITY)
-                    if url:
+                    got = await page.evaluate(GRAB_JS, QUALITY)
+                    url = got.get("url") if got else None
+                    t = got.get("t") if got else None
+                    # Advance, not existence. The old test was `if url:`, which
+                    # a frozen video passes forever - on 2026-09-16 ICE dropped
+                    # mid-print and the relay served the same still frame for
+                    # fifty minutes without one failed cycle, because the
+                    # canvas never stopped producing a valid JPEG.
+                    if url and t is not None and t != last_t:
+                        last_t = t
                         latest["jpeg"] = base64.b64decode(url.split(",", 1)[1])
                         latest["ts"] = time.time()
                         latest["frames"] += 1
                         stale = 0
                     else:
                         stale += 1
-                        if stale > FPS * 10:               # ~10s with no pixels
+                        if stale > FPS * 10:               # ~10s without a new frame
                             raise RuntimeError("video went dead")
                     await asyncio.sleep(interval)
             except Exception as e:
