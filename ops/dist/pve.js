@@ -69,8 +69,30 @@ export async function hostAction(body) {
     });
     return { status, result };
 }
-/** Reachability, not correctness: any HTTP answer counts as up. A 401 from a
- *  login-gated dashboard means the server responded, which is the question. */
+/** What the printer is doing, in the two objects that answer it.
+ *
+ *  Deliberately not the whole status payload: this is one row on a page about
+ *  containers, and the K2 dashboard is one click away for anything more. */
+export async function printerSummary() {
+    const { body } = await jsonRequest(`${config.printerUrl}/printer/objects/query?print_stats&virtual_sdcard`, { timeoutMs: 6_000 });
+    const st = body?.result?.status ?? {};
+    const ps = st.print_stats ?? {};
+    const progress = st.virtual_sdcard?.progress;
+    const percent = typeof progress === "number" ? progress * 100 : null;
+    // Linear from elapsed. The floor is 5%, not the 0.5% the K2 dashboard uses,
+    // because print_duration counts heating and priming: measured at 1.2% into a
+    // file named 3h32m, the same formula claimed 10h 24m left. On a one-line
+    // summary with no chart beside it there is nothing to contradict a number
+    // like that, so it is better withheld than wrong.
+    const elapsed = ps.print_duration ?? 0;
+    const remainingSeconds = percent !== null && percent >= 5 ? (elapsed * (100 - percent)) / percent : null;
+    return {
+        state: ps.state ?? "unknown",
+        percent,
+        filename: ps.filename || undefined,
+        remainingSeconds,
+    };
+}
 export async function probe(url) {
     const t0 = Date.now();
     try {

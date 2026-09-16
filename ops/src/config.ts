@@ -32,6 +32,10 @@ export const config = {
   tokenId: pick("PVE_TOKEN_ID"),
   tokenSecret: pick("PVE_TOKEN_SECRET"),
   exporter: pick("EXPORTER_URL", "http://10.10.10.1:9101/metrics"),
+  // Moonraker on the printer. Read directly rather than through the K2
+  // dashboard, which sits behind its own login - this only needs the two
+  // objects below and they are unauthenticated on the printer itself.
+  printerUrl: pick("PRINTER_URL", "http://10.20.5.28:7125"),
   port: Number(pick("OPS_PORT", "8780")),
   bind: pick("OPS_BIND", "127.0.0.1"),
   user: pick("OPS_USER"),

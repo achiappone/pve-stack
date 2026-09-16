@@ -134,6 +134,8 @@ export interface ServiceEntry {
    *  cost enough confusion already. The probe still runs: a 200 from the edge
    *  means the tunnel is up, which is the thing worth knowing. */
   ssh?: boolean;
+  /** Render the live print summary on this row. */
+  printer?: boolean;
 }
 
 export interface ProbeResult {
@@ -143,10 +145,25 @@ export interface ProbeResult {
   err?: string;
 }
 
+/** One line of "what is the printer doing", for the K2 row under Services.
+ *
+ *  Every field is nullable on purpose: the printer is the only service here
+ *  that gets switched off as a matter of routine, and a powered-down printer
+ *  must read as absent rather than as an error. */
+export interface PrinterSummary {
+  state: string;
+  /** 0..100, or null when no job is loaded. */
+  percent: number | null;
+  filename?: string;
+  /** Moonraker reports elapsed, never remaining, so this is inferred. */
+  remainingSeconds?: number | null;
+}
+
 export interface Snapshot {
   ok: true;
   errors: string[];
   services: ServiceEntry[];
+  printer?: PrinterSummary;
   probes: Record<string, ProbeResult>;
   node?: NodeStatus;
   storage?: StorageEntry[];

@@ -1,20 +1,20 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { config, loginRequired } from "./config.js";
-import { pve, hostMetrics, hostAction, probe } from "./pve.js";
+import { pve, hostMetrics, hostAction, probe, printerSummary } from "./pve.js";
 import { PAGE, LOGIN_HTML } from "./page.js";
 import { VERSION } from "./version.js";
 import { clearDowns, getDowns, readHistory, sampleLoop } from "./history.js";
 import type {
   ActionBody, ActionName, DiskEntry, HostMetrics, LxcEntry,
-  NodeStatus, ProbeResult, ServiceEntry, Snapshot, StorageEntry,
+  NodeStatus, PrinterSummary, ProbeResult, ServiceEntry, Snapshot, StorageEntry,
 } from "./types.js";
 
 /** Which container serves what. Not derivable from the PVE API - it knows the
  *  containers exist but nothing about the hostnames they answer on. */
 const SERVICES: ServiceEntry[] = [
   { ct: 101, name: "K2 Plus printer", url: "https://k2.anthonychiappone.com",
-    desc: "print status, camera, alerts" },
+    desc: "print status, camera, alerts", printer: true },
   { ct: 102, name: "Dev-Ops", url: "https://ops.anthonychiappone.com",
     desc: "this page", self: true },
   { ct: 100, name: "Nginx Proxy Manager", url: "http://10.20.1.46:81",
@@ -99,6 +99,12 @@ async function snapshot(): Promise<Snapshot> {
       out.lxc = l.sort((a, b) => a.vmid - b.vmid);
     }],
     ["exporter", async () => { out.host = await hostMetrics(); }],
+    // A printer that is switched off is normal, not an error worth surfacing -
+    // so this one swallows its failure and simply leaves the row without a
+    // summary, rather than pushing a line into the error banner every 5s.
+    ["printer", async () => {
+      try { out.printer = await printerSummary(); } catch { /* off or unreachable */ }
+    }],
   ];
   // In parallel: one slow call should not delay the rest, and a failing one
   // must not blank the whole page - each records its own error.
