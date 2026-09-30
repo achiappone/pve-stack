@@ -22,7 +22,7 @@ ingress:
   - hostname: ops.anthonychiappone.com
     service: http://10.10.10.2:8780
   - hostname: pve-ssh.anthonychiappone.com
-    service: ssh://10.20.1.43:22
+    service: ssh://10.10.10.1:22
   # The monitoring stack in 103/104/105. Each binds only its vmbr1 address, so
   # this tunnel is the single way in - nothing of theirs is on the office LAN.
   - hostname: beszel.anthonychiappone.com
