@@ -17,6 +17,10 @@ const SERVICES: ServiceEntry[] = [
     desc: "print status, camera, alerts", printer: true },
   { ct: 102, name: "Dev-Ops", url: "https://ops.anthonychiappone.com",
     desc: "this page", self: true },
+  // Drives the DMX rig across the office LAN; nginx binds vmbr1 only, so the
+  // tunnel is the way in and its Access policy is the auth for every user.
+  { ct: 106, name: "PD Lighting", url: "https://lighting.anthonychiappone.com",
+    desc: "lighting control app - GitHub Actions deploys on push to main" },
   { ct: 100, name: "Nginx Proxy Manager", url: "http://10.20.1.46:81",
     desc: "unused", lan: true },
   { ct: null, name: "Proxmox VE", url: "https://pve.anthonychiappone.com",
