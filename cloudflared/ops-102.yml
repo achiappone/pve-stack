@@ -42,4 +42,9 @@ ingress:
   # breaks, and mDNS is filtered on the office wifi so haze.local is no fallback.
   - hostname: haze.anthonychiappone.com
     service: http://10.20.5.52
+  # pd_lighting (CT 106): React app for the DMX rig. Binds its vmbr1 address only.
+  # It drives physical fixtures on the office LAN and has multiple users, so the
+  # Access app (Allowed Users email list, pdlights.dev account) is the auth layer.
+  - hostname: lighting.pdlights.dev
+    service: http://10.10.10.6:80
   - service: http_status:404
