@@ -56,4 +56,9 @@ ingress:
   - hostname: k2-printer.anthonychiappone.com
     service: http://10.20.5.28:4408
 
+  # The haze regulator (ESP32 on the office wifi, 10.20.5.52). Served from the
+  # host, not CT 102: the host is on the same wifi subnet, and CT 102 is on the
+  # lighting network now, which cannot reach the office wifi.
+  - hostname: haze.anthonychiappone.com
+    service: http://10.20.5.52
   - service: http_status:404
