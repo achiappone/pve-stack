@@ -138,6 +138,9 @@ export interface ServiceEntry {
   printer?: boolean;
   /** Render the live haze summary on this row. */
   haze?: boolean;
+  /** Routinely off or unused (a hazer that gets switched off, an idle tool):
+   *  its state shows, but it never counts toward the verdict. */
+  optional?: boolean;
 }
 
 export interface ProbeResult {
@@ -174,6 +177,14 @@ export interface HazeSummary {
   sensorOk: boolean;
 }
 
+export interface TaskEntry {
+  upid?: string;
+  type?: string;
+  status?: string;          // "OK", or the error text; absent while running
+  starttime?: number;
+  endtime?: number;
+}
+
 export interface Snapshot {
   ok: true;
   errors: string[];
@@ -187,6 +198,7 @@ export interface Snapshot {
   disks?: DiskEntry[];
   host?: HostMetrics;
   downs?: Record<string, DownRecord>;
+  lastBackup?: TaskEntry | null;
   /** So a deploy can be confirmed from the API, not just by eye. */
   version?: string;
 }

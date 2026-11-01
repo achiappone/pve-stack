@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { config, loginRequired } from "./config.js";
 import { pve, hostMetrics, hostAction, probe, printerSummary, hazeSummary } from "./pve.js";
 import { PAGE, LOGIN_HTML } from "./page.js";
@@ -17,7 +18,7 @@ const SERVICES = [
     { ct: 106, name: "PD Lighting", url: "https://lighting.pdlights.dev",
         desc: "lighting control app - GitHub Actions deploys on push to main" },
     { ct: 100, name: "Nginx Proxy Manager", url: "http://10.20.1.46:81",
-        desc: "unused", lan: true },
+        desc: "unused", lan: true, optional: true },
     { ct: null, name: "Proxmox VE", url: "https://pve.anthonychiappone.com",
         desc: "stock PVE interface", host: true },
     // The lifeline. Worth a row not because you click it, but because this is
@@ -39,7 +40,7 @@ const SERVICES = [
     // loop for four days, because a panic in setup() never reaches WiFi and so
     // cannot be recovered over the air. Nothing was watching.
     { ct: null, name: "Haze regulator", url: "https://haze.anthonychiappone.com",
-        desc: "PM2.5-regulated hazer - DMX output, live chart", haze: true },
+        desc: "PM2.5-regulated hazer - DMX output, live chart", haze: true, optional: true },
     { ct: null, name: "Home Dev-Ops", url: "https://home.anthonychiappone.com",
         desc: "promox - the home box; health under Other box", external: true },
     { ct: null, name: "Atlas", url: "https://atlaspd.com/login", desc: "", external: true },
@@ -99,6 +100,12 @@ async function snapshot() {
                     out.printer = await printerSummary();
                 }
                 catch { /* off or unreachable */ }
+            }],
+        // The newest vzdump task, so the page can say whether last night's backup
+        // ran - the PVE task log is the record, not the storage's file list.
+        ["last backup", async () => {
+                const t = await pve(`/nodes/${n}/tasks?typefilter=vzdump&limit=1`);
+                out.lastBackup = t[0] ?? null;
             }],
         // Same treatment as the printer: a hazer that is switched off is a normal
         // state, not a line in the error banner twelve times a minute.
@@ -178,6 +185,23 @@ const server = createServer((req, res) => {
 });
 async function handle(req, res) {
     const url = req.url ?? "/";
+    // Self-hosted fonts, before the login gate so the sign-in page has them too.
+    // The name is matched against a strict pattern, so no path ever reaches disk
+    // that is not a flat file in fonts/.
+    if (req.method === "GET" && url.startsWith("/fonts/")) {
+        const name = url.slice("/fonts/".length);
+        if (/^[a-z0-9-]+\.woff2$/.test(name)) {
+            try {
+                const body = readFileSync(new URL(`../fonts/${name}`, import.meta.url));
+                res.writeHead(200, { "Content-Type": "font/woff2", "Content-Length": body.length,
+                    "Cache-Control": "public, max-age=31536000, immutable" });
+                return void res.end(body);
+            }
+            catch { /* fall through to 404 */ }
+        }
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        return void res.end("not found");
+    }
     // A plain form POST answered with a 303, not fetch + reload: password
     // managers (Google's included) recognise a real form submission followed by
     // a navigation as a login, and never offered to save under the old flow.

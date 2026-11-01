@@ -52,6 +52,15 @@ if [ -d "$REPO/ops/dist" ]; then
   for f in "$REPO"/ops/dist/*.js; do
     pct push 102 "$f" "/opt/pve-ops/dist/$(basename "$f")" --perms 644 || ok=0
   done
+  # The page is plain HTML beside dist/ (page.ts reads ../page.html), plus
+  # self-hosted fonts.
+  for f in page.html login.html; do
+    pct push 102 "$REPO/ops/$f" "/opt/pve-ops/$f" --perms 644 || ok=0
+  done
+  pct exec 102 -- mkdir -p /opt/pve-ops/fonts
+  for f in "$REPO"/ops/fonts/*.woff2; do
+    pct push 102 "$f" "/opt/pve-ops/fonts/$(basename "$f")" --perms 644 || ok=0
+  done
   pct push 102 "$REPO/systemd/pve-ops.service" /etc/systemd/system/pve-ops.service || ok=0
   pct exec 102 -- systemctl daemon-reload
   pct exec 102 -- systemctl restart pve-ops || ok=0
