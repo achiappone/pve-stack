@@ -62,8 +62,11 @@ speeds = [s for s in jsonl("/var/lib/netwatch/speeds.jsonl", 14)]
 pings = [p for p in jsonl("/var/lib/netwatch/pings.jsonl", 1440) if "cloudflare" in p and "google" in p]
 ok = [s for s in speeds if "down" in s]
 med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None
+mirror = jsonl("/var/lib/netwatch/mirror.jsonl", 400)
+pushes = [m for m in mirror if m.get("kind") == "push"]
+syncs = [m for m in mirror if m.get("kind") == "sync"]
 internet = None
-if speeds or pings:
+if speeds or pings or mirror:
     last = speeds[-1] if speeds else None
     internet = {
         "last": ({k: last.get(k) for k in ("t", "down", "up", "ping", "error")} if last else None),
@@ -71,6 +74,9 @@ if speeds or pings:
         "outage_minutes": sum(1 for p in pings if p["cloudflare"]["loss"] >= 100 and p["google"]["loss"] >= 100),
         "loss_pct": round(sum((p["cloudflare"]["loss"] + p["google"]["loss"]) / 2 for p in pings) / len(pings), 2) if pings else None,
         "rtt": (pings[-1]["cloudflare"]["rtt"] if pings else None),
+        # This box's push into the other one, and how long its check-ins take.
+        "mirror": {"push": pushes[-1] if pushes else None,
+                   "sync_ms": syncs[-1]["ms"] if syncs else None},
     }
 
 json.dump({
@@ -103,7 +109,12 @@ journalctl -p warning --since -24h --no-pager -o short-iso 2>/dev/null | tail -n
 [ "${DRY_RUN:-0}" = 1 ] && { echo "dry run: bundle in $OUT"; exit 0; }
 
 # -t keeps the mtimes - status.json's is the heartbeat the peer checks.
+# Timed: how long a whole check-in takes end to end is the "ping" between the
+# boxes - an SSH session through both tunnels, so seconds, not milliseconds.
+T0=$(date +%s%N)
 rsync -rt --timeout=120 -e "ssh -i /etc/peer-sync/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes \
 -o UserKnownHostsFile=/etc/peer-sync/known_hosts -o StrictHostKeyChecking=accept-new \
 -o 'ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname %h'" \
   "$OUT/" "root@$PEER_HOST:"
+mkdir -p /var/lib/netwatch
+printf '{"t":%s,"kind":"sync","ms":%s}\n' "$(date +%s)" "$(( ($(date +%s%N) - T0) / 1000000 ))" >> /var/lib/netwatch/mirror.jsonl

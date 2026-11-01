@@ -3,6 +3,10 @@
 
   netwatch.py ping    every minute (netwatch-ping.timer): router, Cloudflare and
                       Google reachability plus a DNS lookup - a few hundred bytes
+  netwatch.py mirror  every 3 hours (netwatch-mirror.timer): push a 16 MB file to
+                      the other Proxmox box through its tunnel and time it - this
+                      box's upload into the other box's download, the real path
+                      between the two sites; the other box measures the reverse
   netwatch.py speed   twice a day (netwatch-speed.timer) or on demand from the
                       dashboard: a full speedtest-cli run, about 450 MB, which is
                       why it is not hourly - Xfinity caps the line at 1.2 TB/month
@@ -90,6 +94,36 @@ def do_speed():
     append("speeds.jsonl", rec, KEEP_SPEEDS, prune=True)
 
 
+PROBE_MB = 16
+
+
+def do_mirror():
+    """Time a 16 MB push to the peer over the same SSH-through-Cloudflare path
+    peer-sync uses, with the same write-only key. -I forces the transfer even
+    though the file is unchanged; random data defeats any compression."""
+    env = dict(l.strip().split("=", 1) for l in open("/etc/peer-sync/env") if "=" in l and not l.startswith("#"))
+    probe = os.path.join(D, "probe.bin")
+    if not os.path.exists(probe) or os.path.getsize(probe) != PROBE_MB << 20:
+        with open(probe, "wb") as f:
+            f.write(os.urandom(PROBE_MB << 20))
+    ssh = ("ssh -i /etc/peer-sync/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes "
+           "-o UserKnownHostsFile=/etc/peer-sync/known_hosts -o StrictHostKeyChecking=accept-new "
+           "-o 'ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname %h'")
+    rec = {"t": int(time.time()), "kind": "push", "to": env.get("PEER_HOST", "?"), "mb": PROBE_MB}
+    t0 = time.monotonic()
+    try:
+        r = subprocess.run(["rsync", "-I", "--whole-file", "--timeout=120", "-e", ssh, probe, f"root@{env['PEER_HOST']}:"],
+                           capture_output=True, text=True, timeout=300)
+        secs = time.monotonic() - t0
+        if r.returncode == 0:
+            rec.update({"seconds": round(secs, 2), "mbps": round(PROBE_MB * 8 * 1.048576 / secs, 1)})
+        else:
+            rec["error"] = (r.stderr or "").strip()[-200:] or f"rsync exit {r.returncode}"
+    except Exception as e:
+        rec["error"] = str(e)[:200]
+    append("mirror.jsonl", rec, 400, prune=True)
+
+
 if __name__ == "__main__":
     os.makedirs(D, exist_ok=True)
-    {"ping": do_ping, "speed": do_speed}[sys.argv[1] if len(sys.argv) > 1 else "ping"]()
+    {"ping": do_ping, "speed": do_speed, "mirror": do_mirror}[sys.argv[1] if len(sys.argv) > 1 else "ping"]()

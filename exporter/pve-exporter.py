@@ -198,8 +198,11 @@ def internet():
     The netwatch timers write the data; this only summarises it."""
     pings = _jsonl("pings.jsonl", 1440)
     speeds = _jsonl("speeds.jsonl", 14)
-    if not pings and not speeds:
+    mirror = _jsonl("mirror.jsonl", 400)
+    if not pings and not speeds and not mirror:
         return None
+    pushes = [m for m in mirror if m.get("kind") == "push"]
+    syncs = [m for m in mirror if m.get("kind") == "sync" and "ms" in m]
     now = pings[-1] if pings else None
     ext = [p for p in pings if "cloudflare" in p and "google" in p]
     # An outage minute is one where neither Cloudflare nor Google answered.
@@ -213,7 +216,10 @@ def internet():
             "loss_pct": round(loss, 2) if loss is not None else None,
             "rtt_avg": round(sum(rtts) / len(rtts), 1) if rtts else None,
             "speeds": speeds[-8:], "typical_down": med([s["down"] for s in ok]),
-            "typical_up": med([s["up"] for s in ok])}
+            "typical_up": med([s["up"] for s in ok]),
+            "mirror": {"pushes": pushes[-6:],
+                       "sync_ms": syncs[-1]["ms"] if syncs else None,
+                       "sync_ms_typical": med([s["ms"] for s in syncs[-288:]])}}
 
 
 def peer():

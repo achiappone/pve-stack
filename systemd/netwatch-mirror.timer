@@ -1,0 +1,9 @@
+[Unit]
+Description=Mirror throughput test to the other box every 3 hours (home at :10, office at :40)
+
+[Timer]
+OnCalendar=*-*-* 00/3:40:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

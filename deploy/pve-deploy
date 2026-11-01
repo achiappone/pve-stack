@@ -140,11 +140,12 @@ if [ -d "$REPO/peer" ]; then
   install -D -m644 "$REPO/peer/peer-sync.conf" /etc/peer-sync/env
   install -m644 "$REPO/peer/uptime-alert.list" /etc/uptime-alert.list
   for u in peer-sync.service peer-sync.timer uptime-alert.service uptime-alert.timer \
-           netwatch-ping.service netwatch-ping.timer netwatch-speed.service netwatch-speed.timer; do
+           netwatch-ping.service netwatch-ping.timer netwatch-speed.service netwatch-speed.timer \
+           netwatch-mirror.service netwatch-mirror.timer; do
     install -m644 "$REPO/systemd/$u" "/etc/systemd/system/$u"
   done
   systemctl daemon-reload
-  systemctl enable --now peer-sync.timer uptime-alert.timer netwatch-ping.timer netwatch-speed.timer >/dev/null 2>&1 \
+  systemctl enable --now peer-sync.timer uptime-alert.timer netwatch-ping.timer netwatch-speed.timer netwatch-mirror.timer >/dev/null 2>&1 \
     && echo "ok: peer-sync + uptime-alert + netwatch timers armed"
 fi
 

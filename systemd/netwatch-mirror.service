@@ -1,0 +1,10 @@
+[Unit]
+Description=Internet watch: time a 16 MB push to the other Proxmox box
+After=network-online.target cloudflared.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/netwatch.py mirror
+StateDirectory=netwatch
+TimeoutStartSec=360

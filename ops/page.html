@@ -378,6 +378,8 @@ footer .wrap{display:flex;gap:18px;flex-wrap:wrap}
         <div class="rows" id="inetnow"></div>
         <div class="sub"><span class="lbl">Last 24 hours</span></div>
         <div class="rows" id="inetday"></div>
+        <div class="sub"><span class="lbl">Between the boxes &mdash; through the tunnels, every 3 hours</span></div>
+        <div class="rows" id="inetmirror"></div>
         <div class="sub"><span class="lbl">Speed tests &mdash; 07:00 and 19:00</span>
           <button class="btn quiet" id="b-speed" type="button">Run speed test now</button></div>
         <div class="rows" id="inetspeed"></div>
@@ -944,7 +946,21 @@ async function tick(){
         s.error ? esc(s.error.slice(0, 100)) : esc(`${s.server}, ${s.where} · ${s.mb} MB`))).join("") +
       (inet.typical_down ? row("Typical", `${inet.typical_down.toFixed(0)} down · ${inet.typical_up.toFixed(1)} up Mbps`, "", "median of the recent tests") : "")
       : '<p class="muted">No speed test yet. They run at 07:00 and 19:00.</p>';
+    // Mirror: this box's timed push into the other box, and the other box's
+    // push back (it measures that itself and sends it over in its check-in).
+    const mir = inet.mirror || {}, mine = (mir.pushes || []).slice(-1)[0];
+    const peerName = (h.peer && h.peer.host) ? esc(h.peer.host) : "the other box";
+    const theirs = ((h.peer && h.peer.internet && h.peer.internet.mirror) || {}).push;
+    const pushRow = (label, m, d) => !m ? row(label, "not measured yet", "", d)
+      : m.error ? row(label, "failed", "warn", esc(String(m.error).slice(0, 90)))
+      : row(label, `${Number(m.mbps).toFixed(1)} Mbps`, "", `${esc(m.mb)} MB in ${Number(m.seconds).toFixed(1)} s · ${upfmt(now - m.t)} ago`);
+    el("inetmirror").innerHTML =
+      pushRow(`To ${peerName}`, mine, "this box's upload into its download") +
+      pushRow(`From ${peerName}`, theirs, "its upload into this box's download") +
+      row("Check-in round trip", mir.sync_ms != null ? (mir.sync_ms / 1000).toFixed(1) + " s" : "—", "",
+        "a whole SSH session through both tunnels" + (mir.sync_ms_typical ? ` · typically ${(mir.sync_ms_typical / 1000).toFixed(1)} s` : ""));
     let il = "ok";
+    if(mine && mine.error) il = worst([il, note("warn", "Internet", `the mirror test to ${h.peer ? h.peer.host : "the other box"} failed`)]);
     const ext = ["cloudflare", "google"].map(k => nw[k]).filter(Boolean);
     if(ext.length && ext.every(x => x.loss >= 100))
       il = worst([il, note("crit", "Internet", nw.router && nw.router.loss < 100 ? "no answer from the internet; the router is up" : "no answer from the router")]);
