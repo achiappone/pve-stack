@@ -1,0 +1,10 @@
+[Unit]
+Description=Internet watch: full speed test (about 450 MB)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/netwatch.py speed
+StateDirectory=netwatch
+TimeoutStartSec=300

@@ -369,6 +369,19 @@ footer .wrap{display:flex;gap:18px;flex-wrap:wrap}
       <span class="dname">Network</span><span class="mark" id="m-network"></span>
       <span class="dnote" id="n-network"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
       <div class="dbody"><div class="rows" id="net"></div></div></details>
+
+    <details class="dept" data-k="internet" hidden><summary>
+      <span class="dname">Internet</span><span class="mark" id="m-internet"></span>
+      <span class="dnote" id="n-internet"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody">
+        <div class="sub"><span class="lbl">Right now</span></div>
+        <div class="rows" id="inetnow"></div>
+        <div class="sub"><span class="lbl">Last 24 hours</span></div>
+        <div class="rows" id="inetday"></div>
+        <div class="sub"><span class="lbl">Speed tests &mdash; 07:00 and 19:00</span>
+          <button class="btn quiet" id="b-speed" type="button">Run speed test now</button></div>
+        <div class="rows" id="inetspeed"></div>
+      </div></details>
   </section>
 
   <aside class="carbon" id="carbon" aria-labelledby="carbon-h">
@@ -457,6 +470,10 @@ document.addEventListener("click", ev => {
   if(act === "ct_stop" && !confirm(`Stop container ${ct} (${name})?`)) return;
   doAction({do:act, ct}, `${act.replace("ct_", "")} ${ct}`, b);
 });
+el("b-speed").onclick = ev => {
+  if(!confirm("Run a speed test now?\n\nIt downloads and uploads about 450 MB of your Xfinity data.")) return;
+  doAction({do:"speedtest"}, "speed test", ev.target);
+};
 el("b-deploy").onclick = ev => {
   if(!confirm("Pull the repo from GitHub and install it?\n\nThis restarts the dashboard and the exporter; the page will blink.")) return;
   doAction({do:"deploy", branch:"main"}, "deploying from GitHub", ev.target);
@@ -902,6 +919,45 @@ async function tick(){
   el("net").innerHTML = brs + links.map(([k, s]) =>
     row(`${esc(k)}${downStamp(downs, "net:" + k)}`, esc(s.oper), s.oper === "up" ? "ok" : "")).join("");
   const vb0 = ((net.bridges || {}).vmbr0 || []).filter(p => !p.startsWith("veth"));
+  /* ---- Internet: only on a box running netwatch (the home box) ---- */
+  const inet = h.internet;
+  document.querySelector('.dept[data-k="internet"]').hidden = !inet;
+  if(inet){
+    const nw = inet.now || {}, nwAge = nw.t ? now - nw.t : null;
+    const tgt = (k, label) => { const x = nw[k]; if(!x) return "";
+      return row(label, x.loss >= 100 ? "no answer" : `${x.rtt != null ? x.rtt.toFixed(0) + " ms" : "—"}${x.loss ? ` · ${x.loss.toFixed(0)}% loss` : ""}`,
+        x.loss >= 100 ? "crit" : x.loss > 0 ? "warn" : ""); };
+    el("inetnow").innerHTML = tgt("router", "Router" + (nw.router_ip ? " · " + esc(nw.router_ip) : "")) + tgt("cloudflare", "Cloudflare · 1.1.1.1") + tgt("google", "Google · 8.8.8.8") +
+      row("DNS", nw.dns === false ? "failing" : nw.dns ? "resolving" : "—", nw.dns === false ? "crit" : "") +
+      (nwAge != null ? row("Checked", upfmt(nwAge) + " ago", nwAge > 300 ? "warn" : "", "every minute") : "");
+    el("inetday").innerHTML =
+      row("Outages", inet.outage_minutes ? `${inet.outage_minutes} min` : "none", inet.outage_minutes ? "warn" : "",
+        inet.last_outage ? `last ${upfmt(now - inet.last_outage)} ago` : `${inet.minutes} minutes checked`) +
+      row("Packet loss", inet.loss_pct != null ? inet.loss_pct.toFixed(2) + "%" : "—", inet.loss_pct >= 2 ? "warn" : "") +
+      row("Latency to Cloudflare", inet.rtt_avg != null ? inet.rtt_avg.toFixed(0) + " ms average" : "—");
+    const sp = (inet.speeds || []).slice().reverse(), lastSp = sp[0];
+    const slow = s => inet.typical_down && s.down < inet.typical_down * 0.5;
+    el("inetspeed").innerHTML = sp.length ? sp.map(s => row(
+        new Date(s.t * 1000).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"}),
+        s.error ? "failed" : `${s.down.toFixed(0)} down · ${s.up.toFixed(1)} up · ${s.ping.toFixed(0)} ms`,
+        s.error ? "crit" : slow(s) ? "warn" : "",
+        s.error ? esc(s.error.slice(0, 100)) : esc(`${s.server}, ${s.where} · ${s.mb} MB`))).join("") +
+      (inet.typical_down ? row("Typical", `${inet.typical_down.toFixed(0)} down · ${inet.typical_up.toFixed(1)} up Mbps`, "", "median of the recent tests") : "")
+      : '<p class="muted">No speed test yet. They run at 07:00 and 19:00.</p>';
+    let il = "ok";
+    const ext = ["cloudflare", "google"].map(k => nw[k]).filter(Boolean);
+    if(ext.length && ext.every(x => x.loss >= 100))
+      il = worst([il, note("crit", "Internet", nw.router && nw.router.loss < 100 ? "no answer from the internet; the router is up" : "no answer from the router")]);
+    else if(ext.some(x => x.loss > 0)) il = worst([il, note("warn", "Internet", "losing packets right now")]);
+    if(nw.dns === false) il = worst([il, note("crit", "Internet", "DNS lookups are failing")]);
+    if(nwAge != null && nwAge > 300) il = worst([il, note("warn", "Internet", `the reachability check last ran ${upfmt(nwAge)} ago`)]);
+    if(lastSp && lastSp.error) il = worst([il, note("warn", "Internet", "the last speed test failed")]);
+    else if(lastSp && slow(lastSp)) il = worst([il, note("warn", "Internet", `slow: ${lastSp.down.toFixed(0)} Mbps down, typically ${inet.typical_down.toFixed(0)}`)]);
+    setDept("internet", il, (lastSp && !lastSp.error ? `<b>${lastSp.down.toFixed(0)}</b> down · ${lastSp.up.toFixed(1)} up Mbps` : "no speed test yet") +
+      ` <span class="m">· ${nw.cloudflare && nw.cloudflare.rtt != null ? nw.cloudflare.rtt.toFixed(0) + " ms" : "—"}` +
+      `${inet.loss_pct != null ? ` · ${inet.loss_pct.toFixed(1)}% loss today` : ""}${inet.outage_minutes ? ` · ${inet.outage_minutes} outage min` : ""}</span>`);
+  }
+
   setDept("network", nl, `vmbr0 on <b>${vb0.length ? esc(vb0.join(", ")) : "nothing"}</b> <span class="m">· ${links.filter(([, s]) => s.oper === "up").length} of ${links.length} interfaces up</span>`);
 
   /* ---- The carbon: the other box ---- */
@@ -944,6 +1000,15 @@ async function tick(){
       row("Backup disk", bk.length ? bk.map(x => `${esc(x.storage)} ${(100 * x.used / x.total).toFixed(0)}%`).join(", ") : "—") +
       row("Last backup", !plb ? "—" : plb.status === "OK" ? `OK · ${upfmt(plbAge)} ago` : `failed · ${upfmt(plbAge)} ago`,
         !plb ? "" : plb.status === "OK" ? "ok" : "crit") +
+      (() => {
+        const pi = p.internet; if(!pi) return "";
+        const ls = pi.last;
+        const slow = ls && !ls.error && pi.typical_down && ls.down < pi.typical_down * 0.5;
+        return row("Internet", !ls ? "no speed test yet" : ls.error ? "speed test failed"
+            : `${Number(ls.down).toFixed(0)} down · ${Number(ls.up).toFixed(1)} up`,
+          !ls ? "" : ls.error || slow ? "warn" : "",
+          ls && ls.t ? `tested ${upfmt(now - ls.t)} ago` + (pi.outage_minutes ? ` · ${esc(pi.outage_minutes)} outage min today` : "") : "");
+      })() +
       row("Failed units", failed.length ? failed.map(esc).join(", ") : "none", failed.length ? "crit" : "ok") +
       row("Its alerts", pdown.length ? pdown.map(esc).join(", ") + " down" : "all up", pdown.length ? "crit" : "ok") +
       `</div><p class="cts">${esc(p.pve)}<br>${cts.map(c => `${esc(c.vmid)} ${esc(c.name)} <span class="${c.status === "running" ? "" : "warn"}">${esc(c.status)}</span>`).join(" · ")}</p>` +

@@ -136,14 +136,16 @@ systemctl enable --now nic-rejoin.timer >/dev/null 2>&1 \
 if [ -d "$REPO/peer" ]; then
   install -m755 "$REPO/peer/peer-sync.sh" /usr/local/sbin/peer-sync.sh
   install -m755 "$REPO/peer/uptime-alert.sh" /usr/local/sbin/uptime-alert.sh
+  install -m755 "$REPO/peer/netwatch.py" /usr/local/sbin/netwatch.py
   install -D -m644 "$REPO/peer/peer-sync.conf" /etc/peer-sync/env
   install -m644 "$REPO/peer/uptime-alert.list" /etc/uptime-alert.list
-  for u in peer-sync.service peer-sync.timer uptime-alert.service uptime-alert.timer; do
+  for u in peer-sync.service peer-sync.timer uptime-alert.service uptime-alert.timer \
+           netwatch-ping.service netwatch-ping.timer netwatch-speed.service netwatch-speed.timer; do
     install -m644 "$REPO/systemd/$u" "/etc/systemd/system/$u"
   done
   systemctl daemon-reload
-  systemctl enable --now peer-sync.timer uptime-alert.timer >/dev/null 2>&1 \
-    && echo "ok: peer-sync + uptime-alert timers armed"
+  systemctl enable --now peer-sync.timer uptime-alert.timer netwatch-ping.timer netwatch-speed.timer >/dev/null 2>&1 \
+    && echo "ok: peer-sync + uptime-alert + netwatch timers armed"
 fi
 
 install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"

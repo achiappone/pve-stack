@@ -52,6 +52,27 @@ try:
 except FileNotFoundError:
     pass
 
+# This box's internet, from netwatch: the last speed test and today's reachability.
+def jsonl(path, last):
+    try:
+        return [json.loads(l) for l in open(path).read().splitlines()[-last:] if l.strip()]
+    except Exception:
+        return []
+speeds = [s for s in jsonl("/var/lib/netwatch/speeds.jsonl", 14)]
+pings = [p for p in jsonl("/var/lib/netwatch/pings.jsonl", 1440) if "cloudflare" in p and "google" in p]
+ok = [s for s in speeds if "down" in s]
+med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None
+internet = None
+if speeds or pings:
+    last = speeds[-1] if speeds else None
+    internet = {
+        "last": ({k: last.get(k) for k in ("t", "down", "up", "ping", "error")} if last else None),
+        "typical_down": med([s["down"] for s in ok]), "typical_up": med([s["up"] for s in ok]),
+        "outage_minutes": sum(1 for p in pings if p["cloudflare"]["loss"] >= 100 and p["google"]["loss"] >= 100),
+        "loss_pct": round(sum((p["cloudflare"]["loss"] + p["google"]["loss"]) / 2 for p in pings) / len(pings), 2) if pings else None,
+        "rtt": (pings[-1]["cloudflare"]["rtt"] if pings else None),
+    }
+
 json.dump({
     "host": n,
     "sent": int(time.time()),
@@ -72,6 +93,7 @@ json.dump({
                      "end": tasks[0].get("endtime")} if tasks else None),
     "failed_units": [l.split()[0] for l in run("systemctl", "--failed", "--no-legend", "--plain").splitlines() if l.strip()],
     "alerts_down": down,
+    "internet": internet,
 }, open(sys.argv[1], "w"))
 PY
 

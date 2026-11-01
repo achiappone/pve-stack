@@ -1,0 +1,10 @@
+[Unit]
+Description=Speed test twice a day (each test is about 450 MB)
+
+[Timer]
+OnCalendar=*-*-* 07,19:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

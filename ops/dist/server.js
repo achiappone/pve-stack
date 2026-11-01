@@ -53,7 +53,7 @@ const SERVICES = [
  *  never heard of it. */
 const ALLOWED_ACTIONS = new Set([
     "fstrim", "ct_reboot", "ct_start", "ct_stop",
-    "nic_rejoin", "governor", "host_reboot", "deploy", "platform_profile",
+    "nic_rejoin", "governor", "host_reboot", "deploy", "platform_profile", "speedtest",
 ]);
 const sessions = new Set();
 const probes = {};

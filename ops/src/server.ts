@@ -59,7 +59,7 @@ const SERVICES: ServiceEntry[] = [
  *  never heard of it. */
 const ALLOWED_ACTIONS: ReadonlySet<ActionName> = new Set<ActionName>([
   "fstrim", "ct_reboot", "ct_start", "ct_stop",
-  "nic_rejoin", "governor", "host_reboot", "deploy", "platform_profile",
+  "nic_rejoin", "governor", "host_reboot", "deploy", "platform_profile", "speedtest",
 ]);
 
 const sessions = new Set<string>();

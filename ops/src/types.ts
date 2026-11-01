@@ -205,7 +205,7 @@ export interface Snapshot {
 
 export type ActionName =
   | "fstrim" | "ct_reboot" | "ct_start" | "ct_stop"
-  | "nic_rejoin" | "governor" | "host_reboot" | "deploy" | "platform_profile"
+  | "nic_rejoin" | "governor" | "host_reboot" | "deploy" | "platform_profile" | "speedtest"
   // Handled here, never forwarded to the exporter: the counters are this
   // server's own state, so clear_downs is absent from ALLOWED_ACTIONS.
   | "clear_downs";

@@ -169,6 +169,53 @@ def deploy_state():
     return {"lines": lines[-12:], "running": running}
 
 
+NET_DIR = "/var/lib/netwatch"
+_net_cache = {}
+
+
+def _jsonl(name, last):
+    """The last `last` records of a netwatch file, re-read only when it changes."""
+    p = os.path.join(NET_DIR, name)
+    try:
+        m = os.path.getmtime(p)
+    except OSError:
+        return []
+    c = _net_cache.get(name)
+    if c and c[0] == m:
+        return c[1]
+    out = []
+    for line in open(p).read().splitlines()[-last:]:
+        try:
+            out.append(json.loads(line))
+        except Exception:
+            pass
+    _net_cache[name] = (m, out)
+    return out
+
+
+def internet():
+    """Reachability now and over the last day, and the recent speed tests.
+    The netwatch timers write the data; this only summarises it."""
+    pings = _jsonl("pings.jsonl", 1440)
+    speeds = _jsonl("speeds.jsonl", 14)
+    if not pings and not speeds:
+        return None
+    now = pings[-1] if pings else None
+    ext = [p for p in pings if "cloudflare" in p and "google" in p]
+    # An outage minute is one where neither Cloudflare nor Google answered.
+    outages = [p["t"] for p in ext if p["cloudflare"]["loss"] >= 100 and p["google"]["loss"] >= 100]
+    loss = (sum((p["cloudflare"]["loss"] + p["google"]["loss"]) / 2 for p in ext) / len(ext)) if ext else None
+    rtts = [p["cloudflare"]["rtt"] for p in ext if p["cloudflare"]["rtt"] is not None]
+    ok = [s for s in speeds if "down" in s]
+    med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None
+    return {"now": now, "minutes": len(ext), "outage_minutes": len(outages),
+            "last_outage": outages[-1] if outages else None,
+            "loss_pct": round(loss, 2) if loss is not None else None,
+            "rtt_avg": round(sum(rtts) / len(rtts), 1) if rtts else None,
+            "speeds": speeds[-8:], "typical_down": med([s["down"] for s in ok]),
+            "typical_up": med([s["up"] for s in ok])}
+
+
 def peer():
     """The other Proxmox box's last check-in (its peer-sync), plus how old it is.
 
@@ -358,6 +405,12 @@ def do_action(body):
                          stdin=subprocess.DEVNULL)
         return {"ok": True, "out": f"deploy started on {branch}"}
 
+    if act == "speedtest":
+        # Started, not awaited: a test takes most of a minute, and the result
+        # lands in the speed history where the page already reads it.
+        r = run(["systemctl", "start", "--no-block", "netwatch-speed.service"], 15)
+        return {"ok": r["ok"], "out": "speed test started - result in about a minute", "err": r["err"]}
+
     if act == "host_reboot":
         # Requires an explicit confirmation string in the body. Every other
         # action here is recoverable from this same dashboard; this one takes
@@ -474,7 +527,7 @@ class H(BaseHTTPRequestHandler):
         body = json.dumps({"hwmon": hwmon(), "volumes": volumes(),
                            "network": network(), "cpu": cpu(),
                            "power": power(), "deploy": deploy_state(),
-                           "peer": peer(),
+                           "peer": peer(), "internet": internet(),
                            "units": dict(UNIT_CACHE)}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

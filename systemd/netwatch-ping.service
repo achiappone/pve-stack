@@ -1,0 +1,7 @@
+[Unit]
+Description=Internet watch: router, Cloudflare, Google and DNS reachability
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/netwatch.py ping
+StateDirectory=netwatch
