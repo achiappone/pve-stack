@@ -40,6 +40,8 @@ const SERVICES = [
     // cannot be recovered over the air. Nothing was watching.
     { ct: null, name: "Haze regulator", url: "https://haze.anthonychiappone.com",
         desc: "PM2.5-regulated hazer - DMX output, live chart", haze: true },
+    { ct: null, name: "Home Dev-Ops", url: "https://home.anthonychiappone.com",
+        desc: "promox - the home box; health under Other box", external: true },
     { ct: null, name: "Atlas", url: "https://atlaspd.com/login", desc: "", external: true },
 ];
 /** Mirrored from the exporter's allowlist. The exporter is the security

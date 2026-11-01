@@ -1,0 +1,10 @@
+[Unit]
+Description=Email when a watched URL goes down or comes back
+After=network-online.target postfix.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=DASH=https://ops.anthonychiappone.com
+ExecStart=/usr/local/sbin/uptime-alert.sh
+StateDirectory=uptime-alert

@@ -1,0 +1,9 @@
+[Unit]
+Description=Send status and recent warnings to the other Proxmox box
+After=network-online.target cloudflared-host.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/peer-sync.sh
+TimeoutStartSec=180

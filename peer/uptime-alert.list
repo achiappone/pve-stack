@@ -1,0 +1,8 @@
+# Watched by uptime-alert.timer every minute. One per line: URL, then a name.
+# Installed to /etc/uptime-alert.list by pve-deploy.
+#
+# Only the home box for now. This box's own services include a printer and a
+# hazer that are switched off as a matter of routine - alerting on those would
+# be noise. The home box's peer-sync refreshes this file every 5 minutes.
+file:/var/log/peer/promox/status.json      home box check-in (promox)
+https://home.anthonychiappone.com          home dashboard (home.anthonychiappone.com)

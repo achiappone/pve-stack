@@ -169,6 +169,23 @@ def deploy_state():
     return {"lines": lines[-12:], "running": running}
 
 
+def peer():
+    """The other Proxmox box's last check-in (its peer-sync), plus how old it is.
+
+    The age is the heartbeat - peer-sync runs every 5 minutes. The content came
+    from another machine, so the page escapes every string it renders."""
+    for f in sorted(glob.glob("/var/log/peer/*/status.json")):
+        try:
+            d = json.load(open(f))
+            if not isinstance(d, dict):
+                raise ValueError("not an object")
+            d["age_s"] = int(time.time() - os.path.getmtime(f))
+            return d
+        except Exception as e:
+            return {"error": f"{os.path.basename(os.path.dirname(f))}: {e}"}
+    return None
+
+
 # Unit states are refreshed on a background thread, not inside the request.
 # `pct exec` into a wedged container blocks - which has happened repeatedly on
 # this box - and the dashboard polls this endpoint every 5 seconds. A stale
@@ -457,6 +474,7 @@ class H(BaseHTTPRequestHandler):
         body = json.dumps({"hwmon": hwmon(), "volumes": volumes(),
                            "network": network(), "cpu": cpu(),
                            "power": power(), "deploy": deploy_state(),
+                           "peer": peer(),
                            "units": dict(UNIT_CACHE)}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

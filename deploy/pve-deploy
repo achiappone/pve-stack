@@ -120,6 +120,23 @@ systemctl enable --now wifi-failover.timer >/dev/null 2>&1 \
 systemctl enable --now nic-rejoin.timer >/dev/null 2>&1 \
   && echo "ok: nic-rejoin.timer armed"
 
+# Peer exchange with the home box (promox): status + heartbeat every 5 minutes,
+# and uptime-alert emailing when the home box stops checking in. Same scripts
+# as home-devops/host/. One-time setup - the key, the home box's restricted
+# authorized_keys entry, the Gmail relay - is in the README.
+if [ -d "$REPO/peer" ]; then
+  install -m755 "$REPO/peer/peer-sync.sh" /usr/local/sbin/peer-sync.sh
+  install -m755 "$REPO/peer/uptime-alert.sh" /usr/local/sbin/uptime-alert.sh
+  install -D -m644 "$REPO/peer/peer-sync.env" /etc/peer-sync/env
+  install -m644 "$REPO/peer/uptime-alert.list" /etc/uptime-alert.list
+  for u in peer-sync.service peer-sync.timer uptime-alert.service uptime-alert.timer; do
+    install -m644 "$REPO/systemd/$u" "/etc/systemd/system/$u"
+  done
+  systemctl daemon-reload
+  systemctl enable --now peer-sync.timer uptime-alert.timer >/dev/null 2>&1 \
+    && echo "ok: peer-sync + uptime-alert timers armed"
+fi
+
 install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"
 install -m644 "$REPO/systemd/pve-exporter.service" /etc/systemd/system/pve-exporter.service
 systemctl daemon-reload
