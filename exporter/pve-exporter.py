@@ -30,6 +30,27 @@ def read(p, d=None):
         return d
 
 
+# Fan speed from the embedded controller's RAM, for laptops whose fan is not
+# exposed through hwmon - the HP 250 G7 publishes no fan rpm at all, and its
+# ACPI fan devices stay off while the EC runs the fan itself. "offset:scale",
+# read-only through ec_sys/debugfs. On the HP, byte 0x11 was found by
+# sampling idle against a full load: 26 idle, 47 under load, then stepping
+# down with the fan's hysteresis - hundreds of rpm. Unset everywhere else.
+EC_FAN = os.environ.get("EXPORTER_EC_FAN", "")
+
+
+def ec_fan():
+    if not EC_FAN:
+        return None
+    try:
+        off, mul = EC_FAN.split(":")
+        with open("/sys/kernel/debug/ec/ec0/io", "rb") as f:
+            f.seek(int(off, 0))
+            return f.read(1)[0] * int(mul)
+    except Exception:
+        return None
+
+
 def hwmon():
     """Fans, pwm and temperatures, keyed by the chip that owns them."""
     out = {"fans": [], "temps": {}, "pwm": []}
@@ -59,6 +80,9 @@ def hwmon():
                 continue
             label = read(f.replace("_input", "_label")) or os.path.basename(f)
             out["temps"].setdefault(name, []).append({"label": label, "c": int(v) / 1000})
+    rpm = ec_fan()
+    if rpm is not None:
+        out["fans"].append({"chip": "ec", "id": "fan_input", "rpm": rpm, "max": None, "target": None})
     return out
 
 

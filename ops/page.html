@@ -751,7 +751,8 @@ async function tick(){
   /* Thermals & power */
   const fans = (h.hwmon || {}).fans || [], pwm = (h.hwmon || {}).pwm || [];
   el("thermal").innerHTML = pick.slice(0, 8).map(([k, v]) => row(esc(k), v.toFixed(0) + "°C", v >= 85 ? "crit" : v >= 70 ? "warn" : "")).join("") +
-    fans.map(f => row(esc(f.id.replace("_input", "")), `${f.rpm} rpm${f.max ? ` · ${Math.round(100 * f.rpm / f.max)}%` : ""}`)).join("") +
+    fans.map(f => row(f.chip === "ec" ? "Fan" : esc(f.id.replace("_input", "")), `${f.rpm} rpm${f.max ? ` · ${Math.round(100 * f.rpm / f.max)}%` : ""}`, "",
+      f.chip === "ec" ? "read from the laptop's controller" : "")).join("") +
     pwm.map(p => row(esc(p.id) + " level", `${p.value}/255`, "dim")).join("") || '<p class="muted">No sensors.</p>';
   const pw = h.power || {}, bat = pw.battery || {}, chg = pw.charger || {};
   let prw = "";
