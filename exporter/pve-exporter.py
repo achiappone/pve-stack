@@ -305,12 +305,19 @@ def refresh_units():
             except Exception:
                 snap[f"host/{u}"] = "unknown"
         for ct in ("101", "102"):
-            for u in WATCH_UNITS[ct]:
-                try:
-                    r = subprocess.run(["pct", "exec", ct, "--", "systemctl", "is-active", u],
-                                       capture_output=True, text=True, timeout=10)
-                    snap[f"{ct}/{u}"] = r.stdout.strip() or "unknown"
-                except Exception:
+            units = WATCH_UNITS[ct]
+            # lxc-attach, not pct exec: pct is Perl and costs ~0.7 s of a full
+            # core per call. Five of those every 20 s kept a core in 4.8 GHz
+            # turbo and spiked the Dell's Package id 0 to 100 C (2026-11-01).
+            # lxc-attach answers in 10 ms; one call covers every unit.
+            try:
+                r = subprocess.run(["lxc-attach", "-n", ct, "--", "systemctl", "is-active", *units],
+                                   capture_output=True, text=True, timeout=10)
+                states = r.stdout.split() + ["unknown"] * len(units)
+                for u, st in zip(units, states):
+                    snap[f"{ct}/{u}"] = st
+            except Exception:
+                for u in units:
                     snap[f"{ct}/{u}"] = "unreachable"
         UNIT_CACHE.clear()
         UNIT_CACHE.update(snap)
