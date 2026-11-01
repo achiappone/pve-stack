@@ -36,6 +36,25 @@ never hold up boot. It replaced the USB disk below, which went missing on
 The K2 printer dashboard itself lives in its own repo,
 `github.com/achiappone/k2plus-dashboard`, and is deployed by `deploy/k2-deploy`.
 
+## Paired with the home box
+
+The home Proxmox box (`promox`, HP 250 G7) has its own repo,
+`achiappone/home-devops`. The two boxes check in with each other every 5
+minutes over `peer/peer-sync.sh`:
+
+- Each dashboard has an *Other box* health panel and a link to the other one.
+- Each box's `uptime-alert` emails if the other goes 15 minutes without
+  checking in.
+- The receiving side pins each box's key to a write-only `rrsync` directory,
+  `/var/log/peer/<sender>`.
+
+`home-devops`'s README has the details.
+
+This box's mail relays through Gmail (`smtp.gmail.com:587`, credentials in
+`/etc/postfix/sasl_passwd`), set up 2026-10-31. Before that, every message
+bounced. Root mail reaches the gmail address through Proxmox's
+`/root/.forward`.
+
 ## Why it is shaped this way
 
 **Each container runs its own `cloudflared`.** Not one shared tunnel, and not
