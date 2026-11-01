@@ -343,18 +343,33 @@ el("b-deploy").onclick = ev => {
 el("status").onclick = () => { if(el("noteslist").children.length) el("notes").hidden = !el("notes").hidden; };
 
 /* ---------------- live history (this tab only) ---------------- */
+const POLL_MS = 5000;
 const HIST = 72;                           // 6 minutes at 5 s
 const hist = {cpu: [], mem: [], tmp: [], net: []};
 const push = (k, v) => { if(typeof v !== "number" || !isFinite(v)) return; hist[k].push(v); if(hist[k].length > HIST) hist[k].shift(); };
+// Smooth curve through the points (Catmull-Rom as cubic Beziers).
+const curve = p => p.slice(1).reduce((d, c, i) => {
+  const a = p[i - 1] || p[i], b = p[i], e = p[i + 2] || c, f = n => n.toFixed(1);
+  return d + ` C${f(b[0] + (c[0] - a[0]) / 6)} ${f(b[1] + (c[1] - a[1]) / 6)},${f(c[0] - (e[0] - b[0]) / 6)} ${f(c[1] - (e[1] - b[1]) / 6)},${f(c[0])} ${f(c[1])}`;
+}, `M${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)}`);
+const sparkScale = {};
 function spark(id, pts, color){
   const s = el(id);
   if(pts.length < 2){ s.innerHTML = ""; return; }
-  const lo = Math.min(...pts), hi = Math.max(...pts), k = (hi - lo) || 1;
-  const xy = pts.map((v, i) => [(i / (HIST - 1)) * 200, 31 - (v - lo) / k * 26]);
-  const off = 200 - xy[xy.length - 1][0];
-  const d = xy.map(([x, y], i) => `${i ? "L" : "M"}${(x + off).toFixed(1)} ${y.toFixed(1)}`).join(" ");
-  s.innerHTML = `<path d="${d} L200 34 L${(xy[0][0] + off).toFixed(1)} 34Z" fill="${color}" opacity=".1"/>` +
-    `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  // The scale widens at once but narrows gradually, so one spike leaving the
+  // window does not jolt the whole line.
+  let lo = Math.min(...pts), hi = Math.max(...pts);
+  const sc = sparkScale[id];
+  if(sc){ lo = Math.min(lo, sc.lo + (lo - sc.lo) * .25); hi = Math.max(hi, sc.hi + (hi - sc.hi) * .25); }
+  sparkScale[id] = {lo, hi};
+  const k = (hi - lo) || 1, step = 200 / (HIST - 1), n = pts.length;
+  // The newest point starts one step past the right edge and the line slides
+  // left by one step over the poll interval: it streams instead of jumping.
+  const xy = pts.map((v, i) => [200 + step - (n - 1 - i) * step, 31 - (v - lo) / k * 26]), d = curve(xy);
+  s.innerHTML = `<g><path d="${d} L${xy[n - 1][0].toFixed(1)} 34 L${xy[0][0].toFixed(1)} 34Z" fill="${color}" opacity=".1"/>` +
+    `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g>`;
+  const g = s.firstChild;
+  requestAnimationFrame(() => requestAnimationFrame(() => { g.style.transition = `transform ${POLL_MS}ms linear`; g.style.transform = `translateX(${-step}px)`; }));
 }
 
 /* ---------------- traffic rates ---------------- */
@@ -385,7 +400,10 @@ function flowAttrs(r, color){
   if(m < 0.005) return `class="flow idle" stroke="${color}" stroke-width="2"`;
   const w = 2 + Math.min(4, Math.log10(1 + m * 4));
   const dur = Math.max(0.35, 3 - Math.log10(1 + m * 10)).toFixed(2);
-  return `class="flow${r.rx > r.tx ? " rev" : ""}" stroke="${color}" stroke-width="${w.toFixed(1)}" style="--dur:${dur}s"`;
+  // A negative delay starts each redrawn line at the phase it would have
+  // reached had it run since page load, so the dashes do not restart every poll.
+  const delay = -(performance.now() / 1000 % dur);
+  return `class="flow${r.rx > r.tx ? " rev" : ""}" stroke="${color}" stroke-width="${w.toFixed(1)}" style="--dur:${dur}s;animation-delay:${delay.toFixed(2)}s"`;
 }
 function drawMap(d, rt){
   const h = d.host || {}, net = h.network || {}, bridges = net.bridges || {}, links = net.links || {};
@@ -395,7 +413,8 @@ function drawMap(d, rt){
   const brColor = i => [getVar("--br0"), getVar("--br1"), "#34d399"][i];
   const brY = {}; brNames.forEach((b, i) => brY[b] = 110 + i * 200);
   const midY = brNames.length > 1 ? (brY[brNames[0]] + brY[brNames[1]]) / 2 : (brY[brNames[0]] || 110) + 90;
-  const H = (brNames.length > 1 ? brY[brNames[brNames.length - 1]] : midY) + 84;
+  // Room under the last bridge's label for the other box, so it covers nothing.
+  const H = (brNames.length > 1 ? brY[brNames[brNames.length - 1]] : midY) + 110;
   const x0 = L + 40, x1 = W - R - 30;
   const xs = lxc.map((c, i) => lxc.length === 1 ? (x0 + x1) / 2 : x0 + (x1 - x0) * i / (lxc.length - 1));
   // Dense boxes (the office has seven containers): names stagger onto two rows
@@ -418,17 +437,18 @@ function drawMap(d, rt){
     phys.forEach((p, j) => {
       const px = L - 10 + j * 50, r = rt[p];
       g += `<path d="M${px} ${y} L ${px} 30" ${flowAttrs(r, getVar("--up"))}/>`;
-      g += `<text class="mlab strong" x="${px + 8}" y="${y - 10}">${esc(p)}</text>`;
-      if(r) g += `<text class="mrate" x="${px + 8}" y="${(y + 30) / 2}">down ${mbps(r.rx)}</text><text class="mrate" x="${px + 8}" y="${(y + 30) / 2 + 14}">up ${mbps(r.tx)}</text>`;
+      // Labels sit just under the Internet strip, above the tunnel's lane.
+      g += `<text class="mlab strong" x="${px + 8}" y="46">${esc(p)}</text>`;
+      if(r) g += `<text class="mrate" x="${px + 8}" y="60">down ${mbps(r.rx)}</text><text class="mrate" x="${px + 8}" y="74">up ${mbps(r.tx)}</text>`;
     });
   });
   // the host's own uplinks that are not bridged (wifi at the office)
   const hostUp = Object.entries(links).filter(([k, v]) => !/^(veth|tap|fwpr|fwln|fwbr|vmbr|lo|tailscale|docker|br-)/.test(k) &&
     !brNames.some(b => (bridges[b] || []).includes(k)) && v.oper === "up");
-  // Laid out like the bridged ports: name, then down, then up, on their own
-  // lines, high enough to stay clear of the host box.
+  // Laid out like the bridged ports: name, then down, then up, just under the
+  // Internet strip and above the tunnel's lane.
   hostUp.forEach(([k], j) => {
-    const r = rt[k], px = hostX - 30 + j * 22, ty = 30 + (hostY - 54) * 0.42;
+    const r = rt[k], px = hostX - 30 + j * 22, ty = 46;
     g += `<path d="M${px} ${hostY - 24} L ${px} 30" ${flowAttrs(r, getVar("--up"))}/>`;
     g += `<text class="mlab strong" x="${px + 8}" y="${ty}">${esc(k)}${links[k].wireless ? " · wifi" : ""}</text>`;
     if(r) g += `<text class="mrate" x="${px + 8}" y="${ty + 14}">down ${mbps(r.rx)}</text><text class="mrate" x="${px + 8}" y="${ty + 28}">up ${mbps(r.tx)}</text>`;
@@ -438,9 +458,12 @@ function drawMap(d, rt){
     `<text class="mlab" x="34" y="23">Internet</text>`;
   const cfX = W - 26;          // the edge column: clear of the bridge labels
   top += `<text class="mlab" x="${cfX - 10}" y="23" text-anchor="end">Cloudflare</text>`;
-  // tunnel: host to Cloudflare
-  g += `<path d="M${hostX + 10} ${hostY - 26} C ${hostX + 30} 70, ${cfX - 200} 50, ${cfX} 30" stroke="${getVar("--accent")}" stroke-width="2" fill="none" stroke-dasharray="6 6" opacity=".7"/>`;
-  g += `<text class="mrate" x="${(hostX + cfX) / 2 + 60}" y="48" text-anchor="middle" style="fill:${getVar("--accent")}">tunnel: dashboard, Proxmox UI, SSH</text>`;
+  // tunnel: host to Cloudflare in its own lane - straight up from the host,
+  // along the gap between the uplink labels and the first bridge, then up
+  // under the Cloudflare label. It crosses the wired uplink line, no labels.
+  const tY = 90, tX = hostX + 25, tE = cfX - 40;
+  g += `<path d="M${tX} ${hostY - 24} L ${tX} ${tY + 10} Q ${tX} ${tY} ${tX + 10} ${tY} L ${tE - 10} ${tY} Q ${tE} ${tY} ${tE} ${tY - 10} L ${tE} 30" stroke="${getVar("--accent")}" stroke-width="2" fill="none" stroke-dasharray="6 6" opacity=".7"/>`;
+  g += `<text class="mrate" x="${(tX + tE) / 2 + 40}" y="${tY - 7}" text-anchor="middle" style="fill:${getVar("--accent")}">tunnel: dashboard, Proxmox UI, SSH</text>`;
   // peer: Cloudflare down to the other box
   const p = h.peer, inet = h.internet || {};
   const peerY = H - 46;
@@ -868,6 +891,6 @@ el("svcs").addEventListener("dragover", ev => { if(!dragRow) return; ev.preventD
 el("svcs").addEventListener("dragend", () => { if(!dragRow) return; dragRow.classList.remove("dragging"); dragRow = null;
   try{ localStorage.svcOrder = JSON.stringify([...el("svcs").children].map(c => c.dataset.name)); }catch(e){} });
 
-tick(); setInterval(tick, 5000);
+tick(); setInterval(tick, POLL_MS);
 loadHistory(); setInterval(loadHistory, 60000);
 </script></body></html>
