@@ -15,8 +15,8 @@ import sys
 src = sys.argv[1] if len(sys.argv) > 1 else "../home-devops/dashboard"
 
 OFFICE_BOX = '''const BOX = {name: "pve-code1", where: "Office", product: "Dev-Ops", accent: "#f472b6", accent2: "#a78bfa", peerAccent: "#2dd4bf",
-  wan: "wlp59s0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"},
-  bridges: {vmbr0: ["lighting network", "containers' way out: the DMX fixtures, the K2 printer and the internet"],
+  wan: "nic0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"},
+  bridges: {vmbr0: ["lighting network", "everyone's way out: the DMX fixtures, the K2 printer and the internet via 2.0.0.2 (the host falls back to wifi)"],
             vmbr1: ["internal · host only", "how the host's tunnel and the dashboard reach containers; nothing outside can reach it"]}};'''
 
 PAGE = [

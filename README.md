@@ -114,6 +114,17 @@ against `EXPORTER_ALLOW` (102 alone) rather than trusting the bridge.
   It reaches the host only, not the containers - but the host is where `nic0`
   gets fixed from, so that is the one that matters.
 
+  **Since 2026-11-01 the wired gateway is the lighting network's router,
+  2.0.0.2**, and the host has 2.0.0.43/8 on `vmbr0` (beside the old
+  10.20.1.43/24). From 2026-09-30, when the wire moved to Art-Net, until then,
+  the failover still probed the old office router 10.20.1.1, so the host sat
+  on wifi for a month. DNS is set through Proxmox (node -> System -> DNS):
+  1.1.1.1, 8.8.8.8, then Chauvet's 10.10.1.4 last. Chauvet's servers do not
+  answer over the lighting network, and the public ones answer over both
+  paths. Nothing blocks the lighting network from reaching 2.0.0.43; that was
+  the user's choice. `/etc/network/interfaces` is not in this repo; the
+  pre-change copy is `interfaces.bak-lighting` on the host.
+
 * **The USB NIC comes back outside the bridge, and nothing put it back.** The
   Alpine Ridge controller `0000:3a:00.0` removes itself and takes every device
   on it with it - 26 times in six days. The devices re-enumerate within about

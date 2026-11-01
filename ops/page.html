@@ -278,8 +278,8 @@ footer{color:var(--faint);font-size:12px;padding:0 0 30px}
    render when that box's server sends them. `wan` is the interface carrying
    this box's internet, for the traffic card. */
 const BOX = {name: "pve-code1", where: "Office", product: "Dev-Ops", accent: "#f472b6", accent2: "#a78bfa", peerAccent: "#2dd4bf",
-  wan: "wlp59s0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"},
-  bridges: {vmbr0: ["lighting network", "containers' way out: the DMX fixtures, the K2 printer and the internet"],
+  wan: "nic0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"},
+  bridges: {vmbr0: ["lighting network", "everyone's way out: the DMX fixtures, the K2 printer and the internet via 2.0.0.2 (the host falls back to wifi)"],
             vmbr1: ["internal · host only", "how the host's tunnel and the dashboard reach containers; nothing outside can reach it"]}};
 
 const el = id => document.getElementById(id);

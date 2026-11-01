@@ -34,7 +34,7 @@ check "wired up, not failed over -> does nothing" "^$" \
   env DRY_RUN=1 STATE="$STATE" FAKE_WIRED=ok bash "$SUT"
 
 touch "$STATE"
-check "wired back, was failed over -> restores vmbr0" "WOULD: ip route replace default via 10.20.1.1 dev vmbr0 onlink" \
+check "wired back, was failed over -> restores vmbr0" "WOULD: ip route replace default via 2.0.0.2 dev vmbr0 onlink" \
   env DRY_RUN=1 STATE="$STATE" FAKE_WIRED=ok bash "$SUT"
 
 rm -f "$STATE"

@@ -14,7 +14,10 @@
 # path is down.
 set -u
 
-LAN_GW=${LAN_GW:-10.20.1.1}
+# The lighting network's router (vmbr0 has been on Art-Net 2.0.0.0/8 since
+# 2026-09-30; the host is 2.0.0.43). Until 2026-11-01 this still said 10.20.1.1,
+# the old office LAN, so the host sat failed-over on wifi for a month.
+LAN_GW=${LAN_GW:-2.0.0.2}
 LAN_IF=${LAN_IF:-vmbr0}
 WIFI_IF=${WIFI_IF:-wlp59s0}
 TRIES=${TRIES:-3}
