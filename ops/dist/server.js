@@ -144,7 +144,7 @@ function sendHtml(res, html) {
     });
     res.end(body);
 }
-async function readBody(req, limit = 8192) {
+async function readText(req, limit = 8192) {
     const chunks = [];
     let size = 0;
     for await (const c of req) {
@@ -153,10 +153,14 @@ async function readBody(req, limit = 8192) {
             throw new Error("body too large");
         chunks.push(c);
     }
-    if (!chunks.length)
+    return Buffer.concat(chunks).toString("utf8");
+}
+async function readBody(req, limit = 8192) {
+    const text = await readText(req, limit);
+    if (!text)
         return {};
     try {
-        return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        return JSON.parse(text);
     }
     catch {
         return {};
@@ -172,23 +176,43 @@ const server = createServer((req, res) => {
 });
 async function handle(req, res) {
     const url = req.url ?? "/";
+    // A plain form POST answered with a 303, not fetch + reload: password
+    // managers (Google's included) recognise a real form submission followed by
+    // a navigation as a login, and never offered to save under the old flow.
     if (req.method === "POST" && url === "/api/login") {
-        const b = (await readBody(req));
+        const b = Object.fromEntries(new URLSearchParams(await readText(req)));
         const ok = loginRequired
-            && safeEqual(String(b.u ?? ""), config.user)
-            && safeEqual(String(b.p ?? ""), config.pass);
-        if (!ok)
-            return sendJson(res, 401, { error: "bad credentials" });
+            && safeEqual(String(b["username"] ?? ""), config.user)
+            && safeEqual(String(b["password"] ?? ""), config.pass);
+        if (!ok) {
+            res.writeHead(303, { Location: "/?bad" });
+            return void res.end();
+        }
         const sid = randomBytes(32).toString("base64url");
         sessions.add(sid);
         // SameSite=Strict is the CSRF defence: the browser will not attach this
         // cookie to a request another site initiated.
         const secure = req.headers["x-forwarded-proto"] === "https" ? "; Secure" : "";
+        res.writeHead(303, {
+            Location: "/",
+            "Set-Cookie": `ops=${sid}; HttpOnly; SameSite=Strict; Path=/${secure}`,
+        });
+        return void res.end();
+    }
+    // Before the gate, so it is idempotent: logging out twice is not an error.
+    // The session is dropped server-side, not just the cookie, so a copied
+    // cookie stops working too.
+    if (req.method === "POST" && url === "/api/logout") {
+        for (const part of (req.headers.cookie ?? "").split(";")) {
+            const [k, ...rest] = part.trim().split("=");
+            if (k === "ops")
+                sessions.delete(rest.join("="));
+        }
         const body = Buffer.from(JSON.stringify({ ok: true }), "utf8");
         res.writeHead(200, {
             "Content-Type": "application/json",
             "Content-Length": body.length,
-            "Set-Cookie": `ops=${sid}; HttpOnly; SameSite=Strict; Path=/${secure}`,
+            "Set-Cookie": "ops=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
         });
         return void res.end(body);
     }
