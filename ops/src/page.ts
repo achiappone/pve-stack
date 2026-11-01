@@ -5,3 +5,5 @@ import { readFileSync } from "node:fs";
 const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
 export const PAGE = read("page.html");
 export const LOGIN_HTML = read("login.html");
+// The show report (2026-11-01), kept at /classic when Midnight replaced it.
+export const CLASSIC = read("classic.html");

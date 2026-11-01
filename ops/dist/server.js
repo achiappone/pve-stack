@@ -3,7 +3,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { config, loginRequired } from "./config.js";
 import { pve, hostMetrics, hostAction, probe, printerSummary, hazeSummary } from "./pve.js";
-import { PAGE, LOGIN_HTML } from "./page.js";
+import { PAGE, LOGIN_HTML, CLASSIC } from "./page.js";
 import { VERSION } from "./version.js";
 import { clearDowns, getDowns, readHistory, sampleLoop } from "./history.js";
 /** Which container serves what. Not derivable from the PVE API - it knows the
@@ -260,6 +260,9 @@ async function handle(req, res) {
         }
         const { status, result } = await hostAction(body);
         return sendJson(res, status, result);
+    }
+    if (req.method === "GET" && url === "/classic") {
+        return sendHtml(res, CLASSIC.replace("{{VERSION}}", VERSION));
     }
     if (req.method === "GET" && (url === "/" || url === "/index.html")) {
         return sendHtml(res, PAGE.replace("{{VERSION}}", VERSION));

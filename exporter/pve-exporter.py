@@ -103,7 +103,14 @@ def network():
         oper = read(f"{i}/operstate")
         if oper is None:
             continue
-        out["links"][n] = {"oper": oper, "carrier": read(f"{i}/carrier", "?")}
+        # Byte counters, so the dashboard can draw traffic on its network map:
+        # it diffs successive reads itself. On a veth the host's rx is what the
+        # container sent.
+        rx, tx = read(f"{i}/statistics/rx_bytes"), read(f"{i}/statistics/tx_bytes")
+        out["links"][n] = {"oper": oper, "carrier": read(f"{i}/carrier", "?"),
+                           "rx": int(rx) if rx and rx.isdigit() else None,
+                           "tx": int(tx) if tx and tx.isdigit() else None,
+                           "wireless": os.path.isdir(f"{i}/wireless")}
     return out
 
 

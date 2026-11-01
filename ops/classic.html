@@ -1,0 +1,1105 @@
+<!doctype html><html lang="en" data-copy="pink"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Dev-Ops · pve-code1</title>
+<style>
+/* Self-hosted (fonts/SOURCES.md): Public Sans is the printed form, Courier
+   Prime the typed hand - every value the box reports. */
+@font-face{font-family:"Public Sans";src:url(/fonts/public-sans-400-800-latin.woff2) format("woff2");font-weight:400 800;font-display:swap}
+@font-face{font-family:"Courier Prime";src:url(/fonts/courier-prime-400-latin.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Courier Prime";src:url(/fonts/courier-prime-700-latin.woff2) format("woff2");font-weight:700;font-display:swap}
+/* The page is a stage manager's show report on an NCR form: rules and labels
+   are printed in blue form ink, everything the box reports is typed in black,
+   faults are marked in red pencil and warnings in orange grease pencil. Each
+   box owns a distribution-copy colour; the other box's report is its carbon. */
+:root{
+  --paper:#fdfdfc; --paper-2:#f4f6f9;
+  --form:#1f4e8c; --form-2:#5b7aa6; --rule:#b9c8db; --rule-2:#dfe6ef;
+  --ink:#15171c; --ink-2:#4a505d;
+  --ok:#21479b; --warn:#b4530a; --crit:#c21d1d;
+  --canary:#f6e6a0; --canary-deep:#e6cf63; --pink:#f6cfd8; --pink-deep:#e8a5b6;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --typed:"Courier Prime",ui-monospace,Menlo,monospace;
+  font-variant-numeric:tabular-nums;
+}
+:root[data-copy="canary"]{--copy:var(--canary);--copy-deep:var(--canary-deep);--peer:var(--pink);--peer-deep:var(--pink-deep)}
+:root[data-copy="pink"]{--copy:var(--pink);--copy-deep:var(--pink-deep);--peer:var(--canary);--peer-deep:var(--canary-deep)}
+*{box-sizing:border-box}
+html{scrollbar-color:var(--rule) transparent}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:15px/1.5 "Public Sans",system-ui,sans-serif;caret-color:var(--form)}
+::selection{background:var(--copy-deep);color:var(--ink)}
+a{color:var(--form);text-underline-offset:3px;text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--form);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* printed labels: the form's own small caps */
+.lbl{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--form)}
+
+/* ---- the copy band ---- */
+.band{background:var(--copy);border-bottom:2px solid var(--form);position:relative}
+.band::after{content:"";position:absolute;left:0;right:0;bottom:-8px;border-bottom:2px dotted var(--rule)}
+.formline{margin:0;padding:5px 0 7px;border-top:1px solid var(--form);font-size:10px;letter-spacing:.12em}
+.band-top{display:flex;align-items:baseline;gap:20px;padding-top:22px;padding-bottom:14px;flex-wrap:wrap}
+h1{margin:0;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.02em;color:var(--form)}
+h1 b{font-weight:800;color:var(--ink)}
+.clock{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:14px}
+.clock time{font-weight:600;min-width:7.5ch}
+/* on the copy band the pencils need the darker carbon inks to stay readable */
+.clock .stale{color:#8f3f06} .clock .dead{color:#a01515}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--form);opacity:.25;
+  transition:opacity .9s var(--ease)}
+.pulse.on{opacity:1;transition:none}
+.fields{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin:0;
+  border-top:1px solid var(--form)}
+.fields div{padding:7px 12px 10px;border-right:1px solid var(--form);min-width:0}
+.fields div:first-child{padding-left:0} .fields div:last-child{border-right:0}
+.fields dt{margin:0 0 2px} .fields dd{margin:0;font-size:15px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---- buttons: ruled form boxes ---- */
+.btn{font:600 12px/1 "Public Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--form);background:var(--paper);border:1px solid var(--form);border-radius:2px;
+  padding:7px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  transition:background .15s var(--ease),color .15s var(--ease)}
+.btn:hover:not(:disabled){background:var(--form);color:var(--paper)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:progress}
+.btn.danger{color:var(--crit);border-color:var(--crit)}
+.btn.danger:hover:not(:disabled){background:var(--crit);color:#fff}
+.btn.quiet{border-color:var(--rule);color:var(--form)}
+.band .btn{background:transparent}
+.band .btn:hover:not(:disabled){background:var(--form);color:var(--copy)}
+select.sel{font:600 13px "Public Sans",sans-serif;color:var(--ink);background:var(--paper);
+  border:1px solid var(--form);border-radius:2px;padding:6px 8px}
+
+/* ---- the verdict ---- */
+.verdict{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;
+  padding-top:30px;padding-bottom:28px}
+.stamp{--c:var(--ok);display:grid;place-items:center;min-width:176px;padding:10px 18px;
+  border:3px double var(--c);border-radius:6px;color:var(--c);transform:rotate(-5deg);
+  font-weight:800;font-size:34px;letter-spacing:.14em;line-height:1;filter:url(#ink);
+  mix-blend-mode:multiply;user-select:none}
+.stamp small{display:block;font-size:10px;letter-spacing:.2em;margin-top:6px;font-weight:700}
+.stamp[data-s="notes"]{--c:var(--warn)} .stamp[data-s="hold"]{--c:var(--crit)}
+.stamp.restamp{animation:stamp .42s var(--ease)}
+@keyframes stamp{0%{opacity:0;transform:rotate(-11deg) scale(1.5)}
+  60%{opacity:1;transform:rotate(-4deg) scale(.95)}100%{transform:rotate(-5deg) scale(1)}}
+.sentence{margin:0;font-size:21px;line-height:1.4;font-weight:400;max-width:60ch;text-wrap:pretty}
+.sentence strong{font-weight:700}
+.notes{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.notes li{display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:baseline;font-size:15px}
+.notes .grease{justify-self:start}
+.notes li .i{vertical-align:-2px}
+.notes .w{color:var(--warn)} .notes .c{color:var(--crit)}
+.notes b{font-weight:600}
+.cue{margin:10px 0 0;min-height:21px;font-size:13px;color:var(--ink-2)}
+.cue.good{color:var(--ok)} .cue.crit{color:var(--crit)}
+
+/* ---- body: ledger + carbon ---- */
+.body{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:32px;
+  padding-bottom:56px;align-items:start}
+.ledger{border-top:2px solid var(--form)}
+.ledger-head{display:flex;align-items:center;gap:12px;padding:12px 0 10px}
+h2{margin:0;font-size:17px;font-weight:700;color:var(--form);letter-spacing:-.005em}
+.ledger-head .btn{margin-left:auto}
+.cols,.dept>summary{display:grid;grid-template-columns:150px 92px minmax(0,1fr) 20px;gap:14px;align-items:center}
+.cols{padding:6px 0;border-top:1px solid var(--form);border-bottom:1px solid var(--rule)}
+.dept{border-bottom:1px solid var(--rule)}
+.dept>summary{list-style:none;cursor:pointer;padding:13px 0;transition:background .15s var(--ease)}
+.dept>summary::-webkit-details-marker{display:none}
+.dept>summary:hover{background:linear-gradient(90deg,transparent,var(--paper-2) 8%,var(--paper-2) 92%,transparent)}
+.dname{font-weight:700;font-size:15px}
+.dnote{color:var(--ink);font-size:14.5px;min-width:0}
+.dnote .m{color:var(--ink-2)}
+.chev{color:var(--form);transition:transform .2s var(--ease)}
+.dept[open] .chev{transform:rotate(90deg)}
+.mark{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase}
+.mark.ok{color:var(--ok)} .mark.warn{color:var(--warn)} .mark.crit{color:var(--crit)}
+/* hand marks: red pencil rings a fault, orange grease pencil underlines a note */
+.ring{position:relative;display:inline-block;padding:0 13px}
+.ring::after{content:"";position:absolute;inset:-7px 0;pointer-events:none;
+  background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'><path d='M34 5C62 2 93 6 96 19C99 33 62 38 32 36C7 34 1 24 5 14C8 7 20 4 46 4' fill='none' stroke='%23c21d1d' stroke-width='2.4' stroke-linecap='round'/></svg>") center/100% 100% no-repeat}
+.grease{background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'><path d='M2 6C20 2.5 38 8.5 58 5S88 3.5 98 6.5' fill='none' stroke='%23b4530a' stroke-width='3.2' stroke-linecap='round' opacity='.85'/></svg>") left bottom/100% 7px no-repeat;padding-bottom:5px}
+.dbody{padding:4px 0 22px 164px}
+.dept::details-content{transition:height .25s var(--ease),content-visibility .25s allow-discrete;height:0;overflow:clip}
+.dept[open]::details-content{height:auto}
+@supports (interpolate-size:allow-keywords){:root{interpolate-size:allow-keywords}}
+.sub{margin:18px 0 6px;display:flex;align-items:center;gap:10px}
+.sub:first-child{margin-top:4px}
+.sub .btn{margin-left:auto}
+
+/* ruled rows inside a department */
+.rows{border-top:1px solid var(--rule-2)}
+.r{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--rule-2);font-size:14px}
+.r .v{text-align:right;font-weight:600;white-space:nowrap}
+.r .d{display:block;color:var(--ink-2);font-size:12.5px;margin-top:1px}
+.ok,.v.ok{color:var(--ink)} .v.warn,.warn{color:var(--warn)} .v.crit,.crit{color:var(--crit)}
+.muted{color:var(--ink-2)}
+.meter{grid-column:1/-1;height:5px;background:var(--rule-2);margin-top:2px}
+.meter i{display:block;height:100%;background:var(--form)}
+.meter i.warn{background:var(--warn)} .meter i.crit{background:var(--crit)}
+
+.fields.strip{grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--rule);margin-bottom:4px}
+.fields.strip dd{white-space:normal;overflow:visible}
+.acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.selwrap{display:inline-flex;align-items:center;gap:8px}
+
+/* services */
+.svc{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:12px;
+  align-items:center;padding:9px 0;border-bottom:1px solid var(--rule-2);font-size:14px}
+.svc a,.svc .nm{font-weight:600}
+.svc .d{color:var(--ink-2);font-size:12.5px;display:block}
+.svc .st{text-align:right;white-space:nowrap;font-size:13px}
+.tag{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--form);border:1px solid var(--rule);padding:0 5px;border-radius:2px;margin-left:6px;
+  vertical-align:1px}
+.tag.live{color:var(--ink);border-color:var(--form);font-family:var(--typed);text-transform:none;letter-spacing:0;font-size:11.5px}
+.tag.crit{color:var(--crit);border-color:var(--crit)}
+.log{margin:6px 0 0;padding:9px 11px;background:var(--paper-2);border:1px solid var(--rule);font:12px/1.5 var(--typed);
+  max-height:190px;overflow:auto;white-space:pre-wrap}
+.reorder .svc{cursor:grab;background:var(--paper-2)} .reorder .svc a{pointer-events:none}
+.svc.dragging{opacity:.4}
+
+/* containers */
+.ct{display:grid;grid-template-columns:48px minmax(0,1fr) 84px 76px 64px 96px;gap:10px;
+  align-items:center;padding:8px 0;border-bottom:1px solid var(--rule-2);font-size:14px}
+.ct .id{color:var(--form);font-weight:700}
+.ct .num{text-align:right;color:var(--ink-2)}
+.ct .act{text-align:right}
+
+/* outage stamps: they stay on the row until cleared */
+.dstamp{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:0 6px;
+  border:1.5px solid var(--warn);color:var(--warn);border-radius:3px;transform:rotate(-3deg);
+  font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;vertical-align:1px}
+.dnclr{all:unset;cursor:pointer;color:var(--warn);display:inline-grid;place-items:center;
+  width:20px;height:20px;border-radius:2px;vertical-align:-4px}
+.dnclr:hover{background:var(--paper-2)} .dnclr:focus-visible{outline:2px solid var(--form)}
+
+/* charts: stacked on one shared time axis, one crosshair */
+.chartbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.chartbar .muted{font-size:12.5px}
+.charts{position:relative;touch-action:pan-y}
+.chart{width:100%;height:auto;display:block}
+.chart text{font:11px "Public Sans",sans-serif;fill:var(--form)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;margin:10px 0 2px}
+.legend i{display:inline-block;width:12px;height:2px;vertical-align:4px;margin-right:6px}
+.readout{position:absolute;top:0;pointer-events:none;background:var(--paper);border:1px solid var(--form);
+  padding:6px 9px;font-size:12px;line-height:1.45;white-space:nowrap;opacity:0;transition:opacity .12s}
+.readout.on{opacity:1}
+
+/* ---- the carbon: the other box's report ---- */
+.carbon{background:var(--peer);border-top:2px dashed var(--peer-deep);padding:18px 20px 20px;
+  position:sticky;top:16px;--warn:#8f3f06;--crit:#a01515;color:#2b2866;text-shadow:0 0 .45px rgba(43,40,102,.55)}
+.carbon .ok,.carbon .v{color:#2b2866}
+.carbon .v.warn,.carbon .warn{color:var(--warn)} .carbon .v.crit,.carbon .crit{color:var(--crit)}
+.carbon h2{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.carbon h2 span{color:var(--ink);font-weight:800}
+.carbon .stampmini{display:inline-block;transform:rotate(-4deg);border:2px double currentColor;
+  border-radius:4px;padding:1px 8px;font-weight:800;font-size:13px;letter-spacing:.14em;
+  filter:url(#ink);margin:12px 0 4px}
+.carbon .line{margin:4px 0 12px;font-size:14px}
+.carbon .rows{border-top:1px solid color-mix(in srgb,var(--form) 35%,transparent)}
+.carbon .r{border-bottom-color:color-mix(in srgb,var(--form) 22%,transparent);padding:6px 0}
+.carbon .cts{margin:12px 0 0;font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.carbon .open{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-weight:600}
+
+/* everything the box reports is typed */
+#fields dd,.fields dd,.dnote,.r .v,.svc .st,.ct .num,.clock time,.sentence,.notes li > span,
+.carbon .line,.carbon .cts,.legend b,.readout{font-family:var(--typed)}
+.notes b{font-family:"Public Sans",sans-serif;font-weight:700}
+.sentence strong,.dnote b{font-weight:700}
+.errs:empty{display:none}
+.errs{margin:0 0 6px;font-size:13px;color:var(--warn)}
+footer{border-top:1px solid var(--rule);padding:16px 0 30px;font-size:12.5px;color:var(--ink-2)}
+footer .wrap{display:flex;gap:18px;flex-wrap:wrap}
+
+@media (max-width:980px){
+  .body{grid-template-columns:1fr}
+  .carbon{position:static;order:-1}
+  #fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #fields div:nth-child(3){border-right:0}
+  #fields div:nth-child(n+4){border-top:1px solid var(--form)}
+  #fields div:nth-child(4){padding-left:0}
+  .dbody{padding-left:0}
+}
+@media (max-width:640px){
+  .wrap{padding:0 16px}
+  h1{font-size:24px}
+  .clock{margin-left:0;width:100%}
+  .clock .btn{margin-left:auto}
+  .verdict{grid-template-columns:1fr;gap:18px;padding-top:36px}
+  .stamp{justify-self:start}
+  .sentence{font-size:19px}
+  .cols{display:none}
+  .dept>summary{grid-template-columns:minmax(0,1fr) auto 20px;row-gap:2px}
+  .dept>summary .dnote{grid-column:1/-1;grid-row:2;font-size:14px}
+  .notes li{grid-template-columns:1fr;gap:4px}
+  .svc{grid-template-columns:1fr auto}
+  .svc .d{grid-column:1/-1;grid-row:2}
+  .ct{grid-template-columns:40px minmax(0,1fr) auto;row-gap:2px}
+  .ct .num{display:none}
+  .r .v{white-space:normal;text-align:right}
+  #fields,.fields.strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #fields div,.fields.strip div{border-right:1px solid var(--form);border-top:1px solid var(--form);padding-left:10px}
+  #fields div:nth-child(odd),.fields.strip div:nth-child(odd){padding-left:0}
+  #fields div:nth-child(even),.fields.strip div:nth-child(even){border-right:0}
+  #fields div:nth-child(-n+2),.fields.strip div:nth-child(-n+2){border-top:0}
+  .fields dd{white-space:normal;overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="ink" x="-5%" y="-10%" width="110%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <symbol id="i-ok" viewBox="0 0 16 16"><path d="M2.5 8.6l3.3 3.2L13.5 4.2"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 3.2v6"/><path d="M8 12.6v.2"/></symbol>
+  <symbol id="i-crit" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M6 3.5l4.5 4.5L6 12.5"/></symbol>
+  <symbol id="i-clear" viewBox="0 0 16 16"><path d="M12.6 9.2A4.8 4.8 0 1 1 11.4 4.4"/><path d="M11.8 1.8v2.9H8.9"/></symbol>
+  <symbol id="i-out" viewBox="0 0 16 16"><path d="M6.5 3.5h6v6"/><path d="M12.3 3.7L4 12"/></symbol>
+</svg>
+
+<header class="band">
+  <div class="wrap band-top">
+    <h1><span id="product">Dev-Ops</span> &middot; <b id="boxname">pve-code1</b></h1>
+    <div class="clock">
+      <span class="lbl">Report</span>
+      <time id="clock">&mdash;</time>
+      <i class="pulse" id="pulse" aria-hidden="true"></i>
+      <button class="btn" id="b-logout">Log out</button>
+    </div>
+  </div>
+  <div class="wrap"><dl class="fields" id="fields"></dl>
+    <p class="formline lbl">Show report &middot; form DO-2 &middot; <span id="copyline"></span></p></div>
+</header>
+
+<section class="wrap verdict" aria-label="Verdict">
+  <div class="stamp" id="stamp" data-s="ok" role="img" aria-label="Verdict">&hellip;</div>
+  <div>
+    <p class="errs" id="errs"></p>
+    <p class="sentence" id="sentence" aria-live="polite">Reading the box&hellip;</p>
+    <ul class="notes" id="notes"></ul>
+    <p class="cue" id="actmsg" role="status"></p>
+  </div>
+</section>
+
+<main class="wrap body">
+  <section class="ledger" aria-labelledby="ledger-h">
+    <div class="ledger-head"><h2 id="ledger-h">Departments</h2>
+      <button class="btn quiet" id="b-all" type="button">Open all</button></div>
+    <div class="cols lbl" aria-hidden="true"><span>Department</span><span>Status</span><span>Note</span><span></span></div>
+
+    <details class="dept" data-k="services"><summary>
+      <span class="dname">Services</span><span class="mark" id="m-services"></span>
+      <span class="dnote" id="n-services"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody">
+        <div class="sub"><span class="lbl">Links</span>
+          <button class="btn quiet" id="reorder" type="button">Reorder</button></div>
+        <div id="svcs"></div>
+        <div class="sub"><span class="lbl">Background units</span></div>
+        <div class="rows" id="units"></div>
+      </div></details>
+
+    <details class="dept" data-k="containers"><summary>
+      <span class="dname">Containers</span><span class="mark" id="m-containers"></span>
+      <span class="dnote" id="n-containers"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody"><div id="cts"></div></div></details>
+
+    <details class="dept" data-k="host"><summary>
+      <span class="dname">Host</span><span class="mark" id="m-host"></span>
+      <span class="dnote" id="n-host"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody">
+        <dl class="fields strip" id="hoststrip"></dl>
+        <div class="sub"><span class="lbl">Memory</span></div>
+        <div class="rows" id="hostmem"></div>
+        <div class="acts" id="hostact"></div>
+        <div id="deploywrap" hidden>
+          <div class="sub"><span class="lbl">Deploy from GitHub</span>
+            <button class="btn" id="b-deploy" type="button">Deploy</button></div>
+          <div class="rows" id="deploylog"></div></div>
+        <div class="sub"><span class="lbl">Machine</span></div>
+        <div class="rows" id="sysinfo"></div>
+      </div></details>
+
+    <details class="dept" data-k="storage"><summary>
+      <span class="dname">Storage &amp; backups</span><span class="mark" id="m-storage"></span>
+      <span class="dnote" id="n-storage"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody">
+        <div class="sub"><span class="lbl">Backups</span></div>
+        <div class="rows" id="backups"></div>
+        <div class="sub"><span class="lbl">Capacity</span></div>
+        <div class="rows" id="usage"></div>
+        <div class="sub"><span class="lbl">Storages</span></div>
+        <div class="rows" id="stores"></div>
+        <div class="sub"><span class="lbl">Devices</span></div>
+        <div class="rows" id="devs"></div>
+        <div class="sub"><span class="lbl">Volumes &mdash; thin allocation, not filesystem use</span></div>
+        <div class="rows" id="vols"></div>
+      </div></details>
+
+    <details class="dept" data-k="thermals"><summary>
+      <span class="dname">Thermals &amp; power</span><span class="mark" id="m-thermals"></span>
+      <span class="dnote" id="n-thermals"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody">
+        <div class="chartbar">
+          <label class="selwrap"><span class="lbl">Range</span>
+          <select class="sel" id="s-range">
+            <option value="0.5">30 minutes</option><option value="1">1 hour</option>
+            <option value="6" selected>6 hours</option><option value="24">24 hours</option>
+            <option value="168">7 days</option></select></label>
+          <span class="muted" id="chartnote"></span>
+        </div>
+        <div class="charts" id="charts"><div class="readout" id="readout"></div></div>
+        <div class="sub"><span class="lbl">Now</span></div>
+        <div class="rows" id="thermal"></div>
+        <div class="sub"><span class="lbl">Power</span></div>
+        <div class="rows" id="power"></div>
+      </div></details>
+
+    <details class="dept" data-k="network"><summary>
+      <span class="dname">Network</span><span class="mark" id="m-network"></span>
+      <span class="dnote" id="n-network"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody"><div class="rows" id="net"></div></div></details>
+
+    <details class="dept" data-k="internet" hidden><summary>
+      <span class="dname">Internet</span><span class="mark" id="m-internet"></span>
+      <span class="dnote" id="n-internet"></span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <div class="dbody">
+        <div class="sub"><span class="lbl">Right now</span></div>
+        <div class="rows" id="inetnow"></div>
+        <div class="sub"><span class="lbl">Last 24 hours</span></div>
+        <div class="rows" id="inetday"></div>
+        <div class="sub"><span class="lbl">Between the boxes &mdash; through the tunnels, every 3 hours</span></div>
+        <div class="rows" id="inetmirror"></div>
+        <div class="sub"><span class="lbl">Speed tests &mdash; 07:00 and 19:00</span>
+          <button class="btn quiet" id="b-speed" type="button">Run speed test now</button></div>
+        <div class="rows" id="inetspeed"></div>
+      </div></details>
+  </section>
+
+  <aside class="carbon" id="carbon" aria-labelledby="carbon-h">
+    <h2 id="carbon-h">Carbon &middot; <span id="peername">other box</span></h2>
+    <div id="peer"><p class="line muted">No check-in received yet.</p></div>
+  </aside>
+</main>
+
+<footer><div class="wrap">
+  <span id="ver"></span>
+  <span>Updates every 5 s &middot; nightly backup 02:00 &middot; the other box checks in every 5 min</span>
+</div></footer>
+
+<script>
+/* Per-box settings. This is the only block that differs between the home and
+   office copies; everything office-only (printer, hazer, Dell profile, NIC
+   rejoin, deploy) renders when that box's server sends it. */
+const BOX = {name: "pve-code1", where: "Office", product: "Dev-Ops", copy: "pink",
+  rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"}};
+
+const el = id => document.getElementById(id);
+const gib = b => (b / 1073741824).toFixed(1);
+const lvlOf = p => p >= 90 ? "crit" : p >= 75 ? "warn" : "ok";
+const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+const icon = (n, cls) => `<svg class="i ${cls || ""}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const RANK = {ok: 0, warn: 1, crit: 2};
+const worst = ls => ls.reduce((a, b) => RANK[b] > RANK[a] ? b : a, "ok");
+
+/* Ages: "4m", "3h 12m", "2d 5h". */
+const upfmt = sec => {
+  sec = Math.max(0, Math.round(sec || 0));
+  if(sec < 60) return sec + "s";
+  if(sec < 3600) return Math.round(sec / 60) + "m";
+  if(sec < 86400) return Math.floor(sec / 3600) + "h " + Math.round(sec % 3600 / 60) + "m";
+  return Math.floor(sec / 86400) + "d " + Math.round(sec % 86400 / 3600) + "h";
+};
+const tlabel = k => k.replace(/^coretemp /, "");
+const meter = (pct, lvl) =>
+  `<span class="meter"><i class="${lvl === "ok" ? "" : lvl}" style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%"></i></span>`;
+const markHtml = lvl => lvl === "ok" ? `<span class="mark ok">${icon("ok")}OK</span>`
+  : lvl === "warn" ? `<span class="mark warn"><span class="grease">Note</span></span>`
+  : `<span class="mark crit"><span class="ring">Fault</span></span>`;
+const row = (k, v, cls, d) =>
+  `<div class="r"><span>${k}${d ? `<span class="d">${d}</span>` : ""}</span><span class="v ${cls || ""}">${v}</span></div>`;
+
+document.documentElement.dataset.copy = BOX.copy;
+el("boxname").textContent = BOX.name;
+el("product").textContent = BOX.product;
+el("copyline").textContent = BOX.copy === "canary" ? "canary copy: home · pink copy: office" : "pink copy: office · canary copy: home";
+document.title = BOX.product + " · " + BOX.name;
+
+/* ---------------- actions ---------------- */
+const actmsg = (t, cls) => { const e = el("actmsg"); e.textContent = t || ""; e.className = "cue " + (cls || ""); };
+async function doAction(body, label, btn){
+  // Only a button gets the "working..." label: writing textContent on a
+  // <select> would replace its options and empty the dropdown.
+  const isBtn = btn && btn.tagName === "BUTTON";
+  if(btn) btn.disabled = true;
+  if(isBtn){ btn.dataset.t = btn.innerHTML; btn.textContent = "working…"; }
+  actmsg(label + "…");
+  try{
+    const r = await fetch("/api/action", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+    const j = await r.json().catch(() => ({}));
+    if(r.status === 401){ location.reload(); return; }
+    if(!r.ok || j.ok === false) throw new Error(j.err || j.error || ("HTTP " + r.status));
+    actmsg(label + " — " + (j.out || "done"), "good");
+    tick();
+  }catch(e){
+    actmsg(label + " failed: " + (e.message || e), "crit");
+  }finally{
+    if(btn) btn.disabled = false;
+    if(isBtn) btn.innerHTML = btn.dataset.t;
+  }
+}
+/* Delegated: tick() rewrites these rows every 5 s, so per-button handlers
+   would be thrown away. */
+document.addEventListener("click", ev => {
+  const b = ev.target.closest && ev.target.closest("button[data-act]");
+  if(!b) return;
+  const {act, ct, k, name} = b.dataset;
+  if(act === "clear_downs") return doAction({do:"clear_downs", target:k}, "clear " + k, b);
+  if(act === "fstrim") return doAction({do:"fstrim", ct}, "fstrim " + name, b);
+  if(act === "ct_reboot" && !confirm(`Restart container ${ct} (${name})?`)) return;
+  if(act === "ct_stop" && !confirm(`Stop container ${ct} (${name})?`)) return;
+  doAction({do:act, ct}, `${act.replace("ct_", "")} ${ct}`, b);
+});
+el("b-speed").onclick = ev => {
+  if(!confirm("Run a speed test now?\n\nIt downloads and uploads about 450 MB of your Xfinity data.")) return;
+  doAction({do:"speedtest"}, "speed test", ev.target);
+};
+el("b-deploy").onclick = ev => {
+  if(!confirm("Pull the repo from GitHub and install it?\n\nThis restarts the dashboard and the exporter; the page will blink.")) return;
+  doAction({do:"deploy", branch:"main"}, "deploying from GitHub", ev.target);
+};
+el("b-logout").onclick = async () => {
+  try{ await fetch("/api/logout", {method:"POST"}); }catch(e){}
+  location.reload();                       // no session -> the server sends the login page
+};
+
+/* Live summaries on a service row: the printer's job and the hazer's output.
+   No summary means the device did not answer - normal for a machine that gets
+   switched off, so it is a quiet tag, not a fault. */
+const fmtLeft = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60);
+  return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`; };
+function printerTag(p){
+  if(!p) return '<span class="tag">offline</span>';
+  const run = p.state === "printing" || p.state === "paused";
+  if(!run || p.percent == null) return `<span class="tag">${esc(p.state)}</span>`;
+  return `<span class="tag live">${p.percent.toFixed(1)}%${p.remainingSeconds != null ? " · " + fmtLeft(p.remainingSeconds) + " left" : ""}</span>`;
+}
+function hazeTag(z){
+  if(!z) return '<span class="tag">offline</span>';
+  if(z.stopped) return '<span class="tag">stopped</span>';
+  return `<span class="tag live">${esc(z.pm25)} µg/m³ · ${esc(z.output)}% ${z.automatic ? "auto" : "manual"}</span>` +
+    (z.sensorOk ? "" : '<span class="tag crit">sensor fault</span>');
+}
+
+/* ---------------- departments: open state ---------------- */
+/* Per-browser preference. A department the visitor never touched opens on its
+   own while it carries a note, and closes again once the note clears. */
+let openPref = {};
+try{ openPref = JSON.parse(localStorage.deptOpen || "{}"); }catch(e){}
+document.querySelectorAll(".dept").forEach(dt => dt.addEventListener("toggle", () => {
+  // The toggle event fires after the change, asynchronously, so a flag set
+  // around the assignment would already be cleared. Mark the element instead.
+  if(dt.dataset.auto){ delete dt.dataset.auto; return; }
+  openPref[dt.dataset.k] = dt.open;
+  try{ localStorage.deptOpen = JSON.stringify(openPref); }catch(e){}
+  syncAllBtn();
+}));
+function syncAllBtn(){
+  const all = [...document.querySelectorAll(".dept")].every(d => d.open);
+  el("b-all").textContent = all ? "Close all" : "Open all";
+}
+el("b-all").onclick = () => {
+  const open = el("b-all").textContent === "Open all";
+  document.querySelectorAll(".dept").forEach(d => { d.open = open; openPref[d.dataset.k] = open; });
+  try{ localStorage.deptOpen = JSON.stringify(openPref); }catch(e){}
+  syncAllBtn();
+};
+function setDept(k, lvl, note){
+  el("m-" + k).innerHTML = markHtml(lvl);
+  el("n-" + k).innerHTML = note;
+  const dt = document.querySelector(`.dept[data-k="${k}"]`);
+  // A department the visitor set stays as set; an untouched one follows its note.
+  const want = (k in openPref) ? openPref[k] : lvl !== "ok";
+  if(dt.open !== want){ dt.dataset.auto = "1"; dt.open = want; }
+}
+
+/* ---------------- charts ---------------- */
+/* Temperatures and fans stacked on one shared time axis: the same x is the
+   same moment in both, and one crosshair reads both. */
+const SERIES = ["var(--form)", "var(--ink)", "#0f766e", "#8a5a9e"];
+const CW = 720, CL = 40, CR = 8;
+let chartState = null;
+function chartSvg(rows, fmt, thresholds, H){
+  const keys = [];
+  for(const [, o] of rows) for(const k in o) if(keys.indexOf(k) < 0) keys.push(k);
+  const use = keys.slice(0, 4);
+  if(!use.length || rows.length < 2) return null;
+  let lo = Infinity, hi = -Infinity;
+  for(const [, o] of rows) for(const k of use){
+    const v = o[k]; if(typeof v !== "number") continue;
+    if(v < lo) lo = v; if(v > hi) hi = v;
+  }
+  if(!isFinite(lo)) return null;
+  if(hi - lo < 1) hi = lo + 1;
+  const pad = (hi - lo) * .14; lo -= pad; hi += pad;
+  const T = 8, B = 20;
+  const t0 = rows[0][0], t1 = rows[rows.length - 1][0];
+  const px = t => CL + (CW - CL - CR) * (t1 === t0 ? 0 : (t - t0) / (t1 - t0));
+  const py = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  let g = "";
+  for(let i = 0; i <= 2; i++){
+    const v = lo + (hi - lo) * i / 2, y = py(v).toFixed(1);
+    g += `<line x1="${CL}" y1="${y}" x2="${CW - CR}" y2="${y}" stroke="var(--rule-2)"/>` +
+      `<text x="${CL - 8}" y="${(py(v) + 4).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+  // A threshold is drawn only where it lands inside the data's own range;
+  // forcing 85 °C onto a curve sitting at 45 would flatten it to a line.
+  for(const [tv, c] of (thresholds || [])){
+    if(tv < lo || tv > hi) continue;
+    g += `<line x1="${CL}" y1="${py(tv).toFixed(1)}" x2="${CW - CR}" y2="${py(tv).toFixed(1)}" ` +
+      `stroke="var(--${c})" stroke-dasharray="5 4" opacity=".7"/>`;
+  }
+  let paths = "", legend = "";
+  use.forEach((k, i) => {
+    const c = SERIES[i % SERIES.length];
+    let dd = "", pen = false, last = null;
+    for(const [t, o] of rows){
+      const v = o[k];
+      if(typeof v !== "number"){ pen = false; continue; }
+      dd += (pen ? "L" : "M") + px(t).toFixed(1) + " " + py(v).toFixed(1) + " ";
+      pen = true; last = v;
+    }
+    paths += `<path d="${dd}" fill="none" stroke="${c}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+    legend += `<span><i style="background:${c}"></i>${esc(tlabel(k))} <b>${last === null ? "" : fmt(last)}</b></span>`;
+  });
+  const lab = t => (t1 - t0) > 86400
+    ? new Date(t * 1000).toLocaleDateString([], {month:"short", day:"numeric"})
+    : new Date(t * 1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  const axis = `<text x="${CL}" y="${H - 5}">${lab(t0)}</text>` +
+    `<text x="${CW - CR}" y="${H - 5}" text-anchor="end">${lab(t1)}</text>`;
+  return {html: `<div class="legend">${legend}</div><svg viewBox="0 0 ${CW} ${H}" class="chart" role="img">` +
+    `${g}${paths}${axis}<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--form)" opacity="0"/></svg>`,
+    keys: use, fmt, t0, t1};
+}
+async function loadHistory(){
+  let pts;
+  try{
+    const r = await fetch("/api/history?hours=" + el("s-range").value);
+    if(r.status === 401){ location.reload(); return; }
+    pts = await r.json();
+  }catch(e){ return; }                     // transient; the next timer retries
+  const box = el("charts"), ro = el("readout");
+  if(!Array.isArray(pts) || pts.length < 2){
+    box.innerHTML = '<p class="muted">Collecting. The server samples on its own timer, so a curve takes a few minutes to appear after a restart.</p>';
+    box.appendChild(ro); el("chartnote").textContent = ""; chartState = null; return;
+  }
+  const a = chartSvg(pts.map(s => [s.t, s.temps]), v => v.toFixed(0) + " °C", [[70, "warn"], [85, "crit"]], 150);
+  const b = chartSvg(pts.map(s => [s.t, s.fans]), v => v.toFixed(0) + " rpm", null, 96);
+  box.innerHTML = (a ? a.html : "") + (b ? b.html : "");
+  box.appendChild(ro);
+  chartState = {pts, a, b};
+  el("chartnote").textContent = `${pts.length} samples · hover to read both at once`;
+}
+function crosshair(ev){
+  if(!chartState) return;
+  const svgs = el("charts").querySelectorAll("svg.chart");
+  if(!svgs.length) return;
+  const r = svgs[0].getBoundingClientRect();
+  const x = (ev.clientX - r.left) / r.width * CW;
+  const {pts, a} = chartState;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const t = t0 + (t1 - t0) * Math.min(1, Math.max(0, (x - CL) / (CW - CL - CR)));
+  let best = pts[0];
+  for(const p of pts) if(Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
+  const bx = CL + (CW - CL - CR) * ((best.t - t0) / ((t1 - t0) || 1));
+  svgs.forEach(s => { const l = s.querySelector(".xh"); l.setAttribute("x1", bx); l.setAttribute("x2", bx); l.setAttribute("opacity", ".55"); });
+  const lines = [new Date(best.t * 1000).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"})];
+  for(const k of (a ? a.keys : [])) if(typeof best.temps[k] === "number") lines.push(`${esc(tlabel(k))} <b>${best.temps[k].toFixed(0)} °C</b>`);
+  for(const k in (best.fans || {})) lines.push(`${esc(k)} <b>${best.fans[k]} rpm</b>`);
+  const ro = el("readout");
+  ro.innerHTML = lines.join("<br>");
+  ro.classList.add("on");
+  const box = el("charts").getBoundingClientRect();
+  const left = ev.clientX - box.left;
+  ro.style.left = (left > box.width / 2 ? left - ro.offsetWidth - 14 : left + 14) + "px";
+  ro.style.top = "28px";
+}
+el("charts").addEventListener("pointermove", crosshair);
+el("charts").addEventListener("pointerleave", () => {
+  el("readout").classList.remove("on");
+  el("charts").querySelectorAll(".xh").forEach(l => l.setAttribute("opacity", "0"));
+});
+el("s-range").onchange = loadHistory;
+
+/* ---------------- the report ---------------- */
+let lastOk = 0, lastVerdict = "";
+function downStamp(downs, key){
+  const r = downs[key];
+  if(!r || !r.downs) return "";
+  const now = Date.now() / 1000;
+  const t = `${r.downs} down${r.downs > 1 ? "s" : ""} in ${upfmt(now - r.since)}` +
+    (r.lastDown ? ` · last ${upfmt(now - r.lastDown)} ago` : "");
+  return `<span class="dstamp" title="${t}">${r.downs} down${r.downs > 1 ? "s" : ""}</span>` +
+    `<button class="dnclr" data-act="clear_downs" data-k="${esc(key)}" title="Clear: ${t}" aria-label="Clear outage count for ${esc(key)}">${icon("clear")}</button>`;
+}
+
+async function tick(){
+  let d;
+  try{
+    const r = await fetch("/api/snapshot");
+    if(r.status === 401){ location.reload(); return; }
+    d = await r.json();
+  }catch(e){
+    el("clock").innerHTML = '<span class="dead">unreachable</span>';
+    return;
+  }
+  lastOk = Date.now();
+  el("clock").textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  const pulse = el("pulse"); pulse.classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => pulse.classList.remove("on")));
+
+  const n = d.node || {}, h = d.host || {}, downs = d.downs || {};
+  const notes = [];                       // [lvl, department, text]
+  const note = (lvl, dept, text) => { if(lvl !== "ok") notes.push([lvl, dept, text]); return lvl; };
+  el("errs").textContent = (d.errors || []).length ? "Could not read: " + d.errors.join(" · ") : "";
+  for(const e of (d.errors || [])) note("warn", "Dashboard", e);
+
+  /* header fields */
+  const lxc = d.lxc || [];
+  const running = lxc.filter(c => c.status === "running").length;
+  const up = n.uptime || 0;
+  el("fields").innerHTML = [
+    ["Venue", `${esc(BOX.where)} · ${esc(BOX.name)}`],
+    ["Proxmox", esc((n.pveversion || "—").replace("pve-manager/", "").split("/")[0])],
+    ["Kernel", esc((n.kversion || "—").replace(/^Linux /, "").split(" ")[0])],
+    ["Up", upfmt(up)],
+    ["Containers", `${running} of ${lxc.length} running`],
+    ["CPU", esc(((n.cpuinfo || {}).model || "—").replace(/\(R\)|\(TM\)|CPU|@.*$/g, "").replace(/\s+/g, " ").trim())],
+  ].map(([k, v]) => `<div><dt class="lbl">${k}</dt><dd title="${v.replace(/<[^>]+>/g, "")}">${v}</dd></div>`).join("");
+
+  /* ---- Services ---- */
+  const byId = Object.fromEntries(lxc.map(c => [String(c.vmid), c]));
+  const svcs = d.services || [], probes = d.probes || {};
+  let saved = [];
+  try{ saved = JSON.parse(localStorage.svcOrder || "[]"); }catch(e){}
+  const rank = sv => { const i = saved.indexOf(sv.name); return i < 0 ? saved.length : i; };
+  // Optional links (a hazer that is routinely switched off, an unused tool)
+  // show their state but never count toward the verdict.
+  const probed = svcs.filter(s => probes[s.url] && !s.optional);
+  const svcDown = probed.filter(s => !probes[s.url].up);
+  const offOptional = svcs.filter(s => s.optional && probes[s.url] && !probes[s.url].up);
+  if(!reordering) el("svcs").innerHTML = svcs.slice().sort((a, b) => rank(a) - rank(b)).map(sv => {
+    const ct = sv.ct == null ? null : byId[String(sv.ct)];
+    const pr = probes[sv.url];
+    const tags = (sv.lan ? '<span class="tag">lan</span>' : "") + (sv.external ? '<span class="tag">offsite</span>' : "") +
+      (sv.self ? '<span class="tag">this page</span>' : "") + (sv.ssh ? '<span class="tag">ssh</span>' : "");
+    const name = sv.ssh ? `<span class="nm">${esc(sv.name)}</span>`
+      : `<a href="${esc(sv.url)}"${sv.self ? "" : ' target="_blank" rel="noopener"'}>${esc(sv.name)}</a>`;
+    // Not every link is a container: a device on the LAN (the hazer) has none.
+    const where = sv.external ? "offsite" : sv.host ? `host · ${esc(BOX.name)}` : sv.ct == null ? "device" :
+      ct ? `<span class="${ct.status === "running" ? "" : "crit"}">ct ${sv.ct} ${esc(ct.status)}</span>` : `<span class="crit">ct ${sv.ct} missing</span>`;
+    const live = sv.printer ? printerTag(d.printer) : sv.haze ? hazeTag(d.haze) : "";
+    return `<div class="svc" data-name="${esc(sv.name)}" draggable="${reordering}">
+      <span>${name}${tags}${live}<span class="d">${esc(sv.desc || "")}</span></span>
+      <span class="d" style="font-size:12.5px">${where}</span>
+      <span class="st">${!pr ? '<span class="muted">checking</span>' : pr.up
+        ? `<span class="ok">answering</span> <span class="muted">${pr.ms} ms</span>`
+        : sv.optional ? '<span class="muted">off</span>' : `<span class="crit">not answering</span>`}</span></div>`;
+  }).join("") || '<p class="muted">No links configured.</p>';
+  const units = Object.entries(h.units || {}).sort();
+  const unitBad = units.filter(([, v]) => v !== "active");
+  el("units").innerHTML = units.map(([k, v]) => {
+    const [where, unit] = k.split("/");
+    return row(esc((BOX.unitLabels || {})[unit] || unit), esc(v), v === "active" ? "ok" : v === "inactive" ? "warn" : "crit",
+      where === "host" ? esc(BOX.name) : "ct " + esc(where));
+  }).join("") || '<p class="muted">No unit data.</p>';
+  let sl = "ok";
+  for(const s of svcDown) sl = worst([sl, note("crit", "Services", `${s.name} not answering`)]);
+  for(const [k, v] of unitBad) sl = worst([sl, note(v === "inactive" ? "warn" : "crit", "Services", `${k.replace("/", " ")} is ${v}`)]);
+  setDept("services", sl, `<b>${probed.length - svcDown.length}</b> of ${probed.length} links answering` +
+    (svcDown.length ? ` <span class="m">· down: ${svcDown.map(s => esc(s.name)).join(", ")}</span>` : "") +
+    (offOptional.length ? ` <span class="m">· ${offOptional.map(s => esc(s.name)).join(", ")} off</span>` : "") +
+    ` <span class="m">· ${units.length - unitBad.length}/${units.length} units active</span>`);
+
+  /* ---- Containers ---- */
+  const selfCt = String((svcs.find(s => s.self) || {}).ct);   // never restart the page you are on
+  const linked = new Set(svcs.filter(s => s.ct != null).map(s => String(s.ct)));
+  el("cts").innerHTML = lxc.map(c => {
+    const on = c.status === "running", self = String(c.vmid) === selfCt;
+    const act = self ? '<span class="muted" style="font-size:12px">this page</span>'
+      : `<button class="btn" data-act="${on ? "ct_reboot" : "ct_start"}" data-ct="${c.vmid}" data-name="${esc(c.name)}">${on ? "Restart" : "Start"}</button>`;
+    return `<div class="ct"><span class="id">${c.vmid}</span>
+      <span>${esc(c.name)}${downStamp(downs, "ct:" + c.vmid)}</span>
+      <span class="${on ? "ok" : linked.has(String(c.vmid)) ? "crit" : "muted"}">${esc(c.status)}</span>
+      <span class="num">${on ? upfmt(c.uptime) : "—"}</span>
+      <span class="num">${Math.round((c.mem || 0) / 1048576)} MB</span>
+      <span class="act">${act}</span></div>`;
+  }).join("") || '<p class="muted">No containers.</p>';
+  const stoppedLinked = lxc.filter(c => c.status !== "running" && linked.has(String(c.vmid)));
+  const stoppedOther = lxc.filter(c => c.status !== "running" && !linked.has(String(c.vmid)));
+  let cl = "ok";
+  for(const c of stoppedLinked) cl = worst([cl, note("crit", "Containers", `${c.vmid} ${c.name} is ${c.status} and serves a link`)]);
+  setDept("containers", cl, `<b>${running}</b> of ${lxc.length} running` +
+    (stoppedOther.length ? ` <span class="m">· ${stoppedOther.map(c => c.vmid).join(", ")} stopped, serving nothing</span>` : ""));
+
+  /* ---- Host ---- */
+  const mem = n.memory || {}, cpuPct = (n.cpu || 0) * 100, memPct = mem.total ? 100 * mem.used / mem.total : 0;
+  const rf = n.rootfs || {}, rfPct = rf.total ? 100 * rf.used / rf.total : 0;
+  el("hoststrip").innerHTML = [
+    ["Load 1 · 5 · 15", esc((n.loadavg || []).join(" · ") || "—")],
+    ["Governor", esc((h.cpu || {}).governor || "—")], ["CPU power", esc((h.cpu || {}).epp || "—")],
+    ["Driver", esc((h.cpu || {}).driver || "—")],
+  ].map(([k, v]) => `<div><dt class="lbl">${k}</dt><dd>${v}</dd></div>`).join("");
+  const memRow = (label, used, total) => {
+    if(!total) return "";
+    const pc = 100 * used / total, l = lvlOf(pc);
+    return `<div class="r"><span>${label}</span><span class="v ${l === "ok" ? "" : l}">${gib(used)} / ${gib(total)} GiB · ${pc.toFixed(1)}%</span>${meter(pc, l)}</div>`;
+  };
+  el("hostmem").innerHTML = memRow("Memory", mem.used || 0, mem.total || 0) + memRow("Swap", (n.swap || {}).used || 0, (n.swap || {}).total || 0);
+  const gov = (h.cpu || {}).governor || "";
+  let acts = "";
+  if(gov){
+    const govs = (h.cpu || {}).available || [];
+    const list = govs.length ? govs : [gov, gov === "performance" ? "powersave" : "performance"];
+    acts += `<label class="selwrap" title="CPU frequency scaling. On intel_pstate even powersave boosts to full turbo under load, so this is subtle.">` +
+      `<span class="lbl">CPU governor</span><select class="sel" id="s-gov">${list.map(g =>
+        `<option value="${esc(g)}"${g === gov ? " selected" : ""}>${esc(g)}</option>`).join("")}</select></label>`;
+  }
+  // Dell firmware thermal mode: the control that actually moves the fans there.
+  const prof = (h.cpu || {}).profile, profs = (h.cpu || {}).profiles || [];
+  if(prof && profs.length)
+    acts += `<label class="selwrap" title="Firmware thermal mode. Sets the thermal envelope, the governor and EPP together; the fans stay with the EC.">` +
+      `<span class="lbl">Thermal profile</span><select class="sel" id="s-prof">${profs.map(p =>
+        `<option value="${esc(p)}"${p === prof ? " selected" : ""}>${esc(p)}</option>`).join("")}</select></label>`;
+  // Only when vmbr0 has actually lost its physical port: a button that is
+  // almost never needed is better hidden than greyed out.
+  const vb0phys = (((h.network || {}).bridges || {}).vmbr0 || []).filter(x => !x.startsWith("veth"));
+  if(BOX.nicRejoin && !vb0phys.length) acts += `<button class="btn danger" id="b-nic">Rejoin nic0 to vmbr0</button>`;
+  acts += `<button class="btn danger" id="b-hostreboot">Reboot ${esc(BOX.name)}</button>`;
+  el("hostact").innerHTML = acts;
+  if(el("s-prof")) el("s-prof").onchange = ev => {
+    if(ev.target.value === prof) return;
+    doAction({do:"platform_profile", value: ev.target.value}, `thermal profile → ${ev.target.value}`, ev.target);
+  };
+  if(el("b-nic")) el("b-nic").onclick = ev => doAction({do:"nic_rejoin"}, "rejoining nic0 to vmbr0", ev.target);
+  const dp = h.deploy;
+  el("deploywrap").hidden = !dp;
+  if(dp){
+    el("b-deploy").disabled = !!dp.running;
+    el("b-deploy").textContent = dp.running ? "Deploying…" : "Deploy";
+    el("deploylog").innerHTML = row("State", dp.running ? "running" : "idle", dp.running ? "warn" : "") +
+      `<pre class="log">${(dp.lines || []).map(l => `<span class="${/FAILED|fatal/.test(l) ? "crit" : /^ok:/.test(l) ? "" : "muted"}">${esc(l)}</span>`).join("\n")}</pre>`;
+  }
+  if(el("s-gov")) el("s-gov").onchange = ev => {
+    if(ev.target.value === gov) return;
+    doAction({do:"governor", value: ev.target.value}, `governor → ${ev.target.value}`, ev.target);
+  };
+  el("b-hostreboot").onclick = ev => {
+    // Two gates: this is the one action that takes down the page you are on.
+    if(!confirm(`Reboot the Proxmox host ${BOX.name}?\n\nThis stops ${running} running containers.`)) return;
+    if(!confirm(`Second confirmation.\n\nThe dashboard and the Cloudflare tunnel go down.\n` +
+      `You will lose remote access for roughly 2 minutes, and if the host does not come back ` +
+      `you will need physical access to it.\n\nReboot now?`)) return;
+    doAction({do:"host_reboot", confirm: BOX.rebootConfirm}, "rebooting host (1 minute delay)", ev.target);
+  };
+  const ci = n.cpuinfo || {}, disk0 = (d.disks || [])[0];
+  el("sysinfo").innerHTML = [
+    ["CPU", esc(ci.model || "—")],
+    ["Cores / threads", ci.cores != null ? `${ci.cores} cores · ${ci.cpus} threads` : "—"],
+    ["Disk", disk0 ? esc(`${disk0.model} (${disk0.type})`) : "—"],
+    ["Disk health", disk0 ? esc(`${disk0.health}${disk0.wearout != null ? ` · ${disk0.wearout}% life left` : ""}`) : "—",
+      disk0 && /PASSED/i.test(disk0.health) ? "ok" : "crit"],
+    ["Proxmox", esc(n.pveversion || "—")], ["Kernel", esc((n.kversion || "—").replace("Linux ", "").slice(0, 48))],
+  ].map(([k, v, c]) => row(k, v, c)).join("");
+  let hl = note(lvlOf(memPct), "Host", `memory at ${memPct.toFixed(0)}%`);
+  if(disk0 && !/PASSED/i.test(disk0.health || "")) hl = worst([hl, note("crit", "Host", `disk health ${disk0.health}`)]);
+  setDept("host", hl, `CPU <b>${cpuPct.toFixed(1)}%</b> <span class="m">· load ${esc((n.loadavg || [])[0] || "—")} · memory ${memPct.toFixed(0)}% of ${gib(mem.total || 0)} GiB · up ${upfmt(up)}</span>`);
+
+  /* ---- Storage & backups ---- */
+  const lb = d.lastBackup;
+  const now = Date.now() / 1000;
+  const backupStore = (d.storage || []).find(s => /backup/i.test(s.storage));
+  let bl;
+  if(!lb) bl = note("warn", "Storage & backups", "no backup has run yet");
+  else if(lb.status && lb.status !== "OK") bl = note("crit", "Storage & backups", `backup failed ${upfmt(now - (lb.endtime || lb.starttime))} ago: ${lb.status.split(" - ").pop()}`);
+  else if(!lb.status) bl = "ok";
+  else bl = note(now - (lb.endtime || lb.starttime) > 26 * 3600 ? "warn" : "ok", "Storage & backups",
+    `last backup ${upfmt(now - (lb.endtime || lb.starttime))} ago`);
+  el("backups").innerHTML =
+    row("Last backup", !lb ? "never" : !lb.status ? "running now" : lb.status === "OK" ? "OK" : "failed",
+      !lb ? "warn" : !lb.status ? "" : lb.status === "OK" ? "ok" : "crit",
+      lb ? `${new Date((lb.starttime || 0) * 1000).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"})}` +
+        (lb.status && lb.status !== "OK" ? ` · ${esc(lb.status).slice(0, 140)}` : "") : "") +
+    row("Schedule", "nightly 02:00, every container", "", backupStore ? `to ${esc(backupStore.storage)}` : "");
+  const usage = [];
+  const pushU = (label, used, total) => {
+    if(!total) return;
+    const p = 100 * used / total, l = lvlOf(p);
+    usage.push(`<div class="r"><span>${label}</span><span class="v ${l === "ok" ? "" : l}">${gib(used)} / ${gib(total)} GiB · ${p.toFixed(1)}%</span>${meter(p, l)}</div>`);
+  };
+  const lvm = (d.storage || []).find(x => x.storage === "local-lvm") || {};
+  pushU("Root filesystem", rf.used || 0, rf.total || 0);
+  pushU("Thin pool (local-lvm)", lvm.used || 0, lvm.total || 0);
+  el("usage").innerHTML = usage.join("");
+  let stl = bl;
+  el("stores").innerHTML = (d.storage || []).map(st => {
+    const p = st.total ? (st.used || 0) / st.total * 100 : 0, l = lvlOf(p);
+    stl = worst([stl, note(l, "Storage & backups", `${st.storage} at ${p.toFixed(0)}%`)]);
+    return `<div class="r"><span>${esc(st.storage)} <span class="muted" style="font-size:12.5px">${esc(st.type || "")}</span></span>
+      <span class="v ${l === "ok" ? "" : l}">${gib(st.avail || 0)} GiB free of ${gib(st.total || 0)}</span>${meter(p, l)}</div>`;
+  }).join("") || '<p class="muted">No storage data.</p>';
+  el("devs").innerHTML = (d.disks || []).map(dk => {
+    const usb = (dk.by_id_link || "").includes("/usb-");
+    return row(`${esc(dk.devpath || "?")}${usb ? '<span class="tag">usb</span>' : ""}`,
+      `${gib(dk.size || 0)} GiB · ${esc(dk.health || "?")}`, dk.health === "PASSED" ? "ok" : /UNKNOWN/i.test(dk.health || "") ? "muted" : "warn",
+      `${esc(dk.model || "")} · ${esc(dk.used || "unused")}`);
+  }).join("") || '<p class="muted">Nothing attached.</p>';
+  const vols = (h.volumes || []).filter(v => v.alloc_pct != null);
+  el("vols").innerHTML = vols.map(v => {
+    const l = lvlOf(v.alloc_pct), m = /^vm-(\d+)-disk/.exec(v.lv);
+    stl = worst([stl, note(l, "Storage & backups", `${v.lv} is ${v.alloc_pct.toFixed(0)}% allocated - fstrim may help`)]);
+    return `<div class="r"><span>${esc(v.lv)}</span><span class="v ${l === "ok" ? "" : l}">${v.alloc_pct.toFixed(1)}% of ${v.size_g.toFixed(0)} GiB` +
+      (m ? ` <button class="btn quiet" data-act="fstrim" data-ct="${m[1]}" data-name="${esc(v.lv)}" style="margin-left:8px;padding:4px 8px">fstrim</button>` : "") +
+      `</span>${meter(v.alloc_pct, l)}</div>`;
+  }).join("") || '<p class="muted">No thin volumes.</p>';
+  setDept("storage", stl, `root <b>${rfPct.toFixed(0)}%</b> <span class="m">· pool ${lvm.total ? (100 * lvm.used / lvm.total).toFixed(0) : "—"}%` +
+    (backupStore && backupStore.total ? ` · ${esc(backupStore.storage)} ${(100 * backupStore.used / backupStore.total).toFixed(0)}%` : "") +
+    ` · last backup ${!lb ? "never" : !lb.status ? "running" : lb.status === "OK" ? "OK " + upfmt(now - (lb.endtime || lb.starttime)) + " ago" : "<span class=\"crit\">failed</span>"}</span>`);
+
+  /* ---- Thermals & power ---- */
+  const temps = (h.hwmon || {}).temps || {}, fans = (h.hwmon || {}).fans || [], pwm = (h.hwmon || {}).pwm || [];
+  const pick = [];
+  for(const [chip, list] of Object.entries(temps)) for(const t of list)
+    if(/Package|Composite|acpitz|temp1/i.test(t.label) || chip === "coretemp") pick.push([tlabel(`${chip} ${t.label}`), t.c]);
+  const hottest = pick.reduce((a, b) => (b[1] > (a ? a[1] : -1) ? b : a), null);
+  const pkg = pick.find(p => /Package/.test(p[0]));
+  el("thermal").innerHTML = pick.slice(0, 8).map(([k, v]) =>
+    row(esc(k), v.toFixed(0) + " °C", v >= 85 ? "crit" : v >= 70 ? "warn" : "")).join("") +
+    fans.map(f => row(esc(f.id.replace("_input", "")), `${f.rpm} rpm${f.max ? ` · ${Math.round(100 * f.rpm / f.max)}%` : ""}`)).join("") +
+    pwm.map(p => row(esc(p.id) + " level", `${p.value}/255`, "", "raw hwmon value; the rpm is the speed")).join("") ||
+    '<p class="muted">No sensors.</p>';
+  const pw = h.power || {}, bat = pw.battery || {}, chg = pw.charger || {};
+  let pr = "";
+  if(bat.percent != null){
+    const bc = bat.status === "Discharging" ? (bat.percent < 20 ? "crit" : "warn") : "ok";
+    pr += `<div class="r"><span>Battery</span><span class="v ${bc}">${bat.percent}% · ${esc(bat.status || "")}</span>${meter(bat.percent, bc === "ok" ? "ok" : bc)}</div>`;
+  }
+  pr += row("On mains", pw.ac_online ? "yes" : "no — on battery", pw.ac_online ? "ok" : "crit");
+  if(chg.watts != null) pr += row("Charger", `${chg.volts} V × ${chg.amps} A = ${chg.watts} W`);
+  if(pw.minutes_to_full != null) pr += row("Time to full", `${Math.floor(pw.minutes_to_full / 60)}h ${String(pw.minutes_to_full % 60).padStart(2, "0")}m`);
+  if(bat.wh_full != null) pr += row("Capacity", `${bat.wh_now} / ${bat.wh_full} Wh`);
+  if(bat.cycles != null) pr += row("Cycles", esc(bat.cycles));
+  el("power").innerHTML = pr;
+  let tl = "ok";
+  if(hottest) tl = note(hottest[1] >= 85 ? "crit" : hottest[1] >= 70 ? "warn" : "ok", "Thermals & power", `${hottest[0]} at ${hottest[1].toFixed(0)} °C`);
+  if(pw.ac_online === false) tl = worst([tl, note("crit", "Thermals & power", "running on battery")]);
+  setDept("thermals", tl, (pkg ? `package <b>${pkg[1].toFixed(0)} °C</b>` : hottest ? `<b>${hottest[1].toFixed(0)} °C</b>` : "no sensors") +
+    `<span class="m">${hottest && pkg && hottest !== pkg ? ` · hottest ${esc(hottest[0])} ${hottest[1].toFixed(0)} °C` : ""} · ${pw.ac_online === false ? '<span class="crit">on battery</span>' : "on mains"}${bat.percent != null ? ` · battery ${bat.percent}%` : ""}</span>`);
+
+  /* ---- Network ---- */
+  const net = h.network || {};
+  let nl = "ok";
+  const brs = Object.entries(net.bridges || {}).map(([b, ports]) => {
+    const phys = ports.filter(p => !p.startsWith("veth"));
+    const bad = b === "vmbr0" && phys.length === 0;
+    if(bad) nl = worst([nl, note("crit", "Network", "vmbr0 has no physical port")]);
+    return row(`${esc(b)}${downStamp(downs, "bridge:" + b)}`, phys.length ? esc(phys.join(", ")) : "no physical port",
+      bad ? "crit" : phys.length ? "ok" : "", `${ports.length - phys.length} container port${ports.length - phys.length === 1 ? "" : "s"}`);
+  }).join("");
+  const links = Object.entries(net.links || {}).filter(([k]) => !k.startsWith("veth"));
+  el("net").innerHTML = brs + links.map(([k, s]) =>
+    row(`${esc(k)}${downStamp(downs, "net:" + k)}`, esc(s.oper), s.oper === "up" ? "ok" : "")).join("");
+  const vb0 = ((net.bridges || {}).vmbr0 || []).filter(p => !p.startsWith("veth"));
+  /* ---- Internet: only on a box running netwatch (the home box) ---- */
+  const inet = h.internet;
+  document.querySelector('.dept[data-k="internet"]').hidden = !inet;
+  if(inet){
+    const nw = inet.now || {}, nwAge = nw.t ? now - nw.t : null;
+    const tgt = (k, label) => { const x = nw[k]; if(!x) return "";
+      return row(label, x.loss >= 100 ? "no answer" : `${x.rtt != null ? x.rtt.toFixed(0) + " ms" : "—"}${x.loss ? ` · ${x.loss.toFixed(0)}% loss` : ""}`,
+        x.loss >= 100 ? "crit" : x.loss > 0 ? "warn" : ""); };
+    el("inetnow").innerHTML = tgt("router", "Router" + (nw.router_ip ? " · " + esc(nw.router_ip) : "")) + tgt("cloudflare", "Cloudflare · 1.1.1.1") + tgt("google", "Google · 8.8.8.8") +
+      row("DNS", nw.dns === false ? "failing" : nw.dns ? "resolving" : "—", nw.dns === false ? "crit" : "") +
+      (nwAge != null ? row("Checked", upfmt(nwAge) + " ago", nwAge > 300 ? "warn" : "", "every minute") : "");
+    el("inetday").innerHTML =
+      row("Outages", inet.outage_minutes ? `${inet.outage_minutes} min` : "none", inet.outage_minutes ? "warn" : "",
+        inet.last_outage ? `last ${upfmt(now - inet.last_outage)} ago` : `${inet.minutes} minutes checked`) +
+      row("Packet loss", inet.loss_pct != null ? inet.loss_pct.toFixed(2) + "%" : "—", inet.loss_pct >= 2 ? "warn" : "") +
+      row("Latency to Cloudflare", inet.rtt_avg != null ? inet.rtt_avg.toFixed(0) + " ms average" : "—");
+    const sp = (inet.speeds || []).slice().reverse(), lastSp = sp[0];
+    const slow = s => inet.typical_down && s.down < inet.typical_down * 0.5;
+    el("inetspeed").innerHTML = sp.length ? sp.map(s => row(
+        new Date(s.t * 1000).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"}),
+        s.error ? "failed" : `${s.down.toFixed(0)} down · ${s.up.toFixed(1)} up · ${s.ping.toFixed(0)} ms`,
+        s.error ? "crit" : slow(s) ? "warn" : "",
+        s.error ? esc(s.error.slice(0, 100)) : esc(`${s.server}, ${s.where} · ${s.mb} MB`))).join("") +
+      (inet.typical_down ? row("Typical", `${inet.typical_down.toFixed(0)} down · ${inet.typical_up.toFixed(1)} up Mbps`, "", "median of the recent tests") : "")
+      : '<p class="muted">No speed test yet. They run at 07:00 and 19:00.</p>';
+    // Mirror: this box's timed push into the other box, and the other box's
+    // push back (it measures that itself and sends it over in its check-in).
+    const mir = inet.mirror || {}, mine = (mir.pushes || []).slice(-1)[0];
+    const peerName = (h.peer && h.peer.host) ? esc(h.peer.host) : "the other box";
+    const theirs = ((h.peer && h.peer.internet && h.peer.internet.mirror) || {}).push;
+    const pushRow = (label, m, d) => !m ? row(label, "not measured yet", "", d)
+      : m.error ? row(label, "failed", "warn", esc(String(m.error).slice(0, 90)))
+      : row(label, `${Number(m.mbps).toFixed(1)} Mbps`, "", `${esc(m.mb)} MB in ${Number(m.seconds).toFixed(1)} s · ${upfmt(now - m.t)} ago`);
+    el("inetmirror").innerHTML =
+      pushRow(`To ${peerName}`, mine, "this box's upload into its download") +
+      pushRow(`From ${peerName}`, theirs, "its upload into this box's download") +
+      row("Check-in round trip", mir.sync_ms != null ? (mir.sync_ms / 1000).toFixed(1) + " s" : "—", "",
+        "a whole SSH session through both tunnels" + (mir.sync_ms_typical ? ` · typically ${(mir.sync_ms_typical / 1000).toFixed(1)} s` : ""));
+    let il = "ok";
+    if(mine && mine.error) il = worst([il, note("warn", "Internet", `the mirror test to ${h.peer ? h.peer.host : "the other box"} failed`)]);
+    const ext = ["cloudflare", "google"].map(k => nw[k]).filter(Boolean);
+    if(ext.length && ext.every(x => x.loss >= 100))
+      il = worst([il, note("crit", "Internet", nw.router && nw.router.loss < 100 ? "no answer from the internet; the router is up" : "no answer from the router")]);
+    else if(ext.some(x => x.loss > 0)) il = worst([il, note("warn", "Internet", "losing packets right now")]);
+    if(nw.dns === false) il = worst([il, note("crit", "Internet", "DNS lookups are failing")]);
+    if(nwAge != null && nwAge > 300) il = worst([il, note("warn", "Internet", `the reachability check last ran ${upfmt(nwAge)} ago`)]);
+    if(lastSp && lastSp.error) il = worst([il, note("warn", "Internet", "the last speed test failed")]);
+    else if(lastSp && slow(lastSp)) il = worst([il, note("warn", "Internet", `slow: ${lastSp.down.toFixed(0)} Mbps down, typically ${inet.typical_down.toFixed(0)}`)]);
+    setDept("internet", il, (lastSp && !lastSp.error ? `<b>${lastSp.down.toFixed(0)}</b> down · ${lastSp.up.toFixed(1)} up Mbps` : "no speed test yet") +
+      ` <span class="m">· ${nw.cloudflare && nw.cloudflare.rtt != null ? nw.cloudflare.rtt.toFixed(0) + " ms" : "—"}` +
+      `${inet.loss_pct != null ? ` · ${inet.loss_pct.toFixed(1)}% loss today` : ""}${inet.outage_minutes ? ` · ${inet.outage_minutes} outage min` : ""}</span>`);
+  }
+
+  setDept("network", nl, `vmbr0 on <b>${vb0.length ? esc(vb0.join(", ")) : "nothing"}</b> <span class="m">· ${links.filter(([, s]) => s.oper === "up").length} of ${links.length} interfaces up</span>`);
+
+  /* ---- The carbon: the other box ---- */
+  // Everything here came from another machine: every string is escaped, so a
+  // compromised peer cannot script this page.
+  const p = h.peer;
+  let peerLine = "";
+  if(!p){
+    el("peername").textContent = "other box";
+    el("peer").innerHTML = '<p class="line muted">No check-in received yet.</p>';
+    note("warn", "Other box", "no check-in received yet");
+  }else if(p.error){
+    el("peer").innerHTML = `<p class="line crit">${esc(p.error)}</p>`;
+    note("warn", "Other box", "its report is unreadable");
+  }else{
+    const age = Number(p.age_s) || 0;
+    const cts = Array.isArray(p.cts) ? p.cts : [];
+    const prun = cts.filter(c => c.status === "running").length;
+    const failed = Array.isArray(p.failed_units) ? p.failed_units : [];
+    const pdown = Array.isArray(p.alerts_down) ? p.alerts_down : [];
+    const plb = p.last_backup || null;
+    const plbAge = plb ? Math.max(0, Math.round(now - (plb.end || plb.start || 0))) : 0;
+    const bk = (p.storage || []).filter(x => /backup/i.test(x.storage || "") && x.total);
+    const dash = /^https:\/\//.test(p.dashboard || "") ? p.dashboard : "";
+    const ageL = age >= 1200 ? "crit" : age >= 600 ? "warn" : "ok";
+    let pl = note(ageL, "Other box", `${p.host} last checked in ${upfmt(age)} ago`);
+    if(failed.length) pl = worst([pl, note("warn", "Other box", `${p.host} reports failed units: ${failed.join(", ")}`)]);
+    if(pdown.length) pl = worst([pl, note("warn", "Other box", `${p.host} sees ${pdown.join(", ")} down`)]);
+    if(plb && plb.status && plb.status !== "OK") pl = worst([pl, note("warn", "Other box", `${p.host}'s last backup failed`)]);
+    const word = pl === "ok" ? "CLEAN" : pl === "warn" ? "NOTES" : "HOLD";
+    el("peername").textContent = p.host;
+    peerLine = `${esc(p.host)} checked in ${upfmt(age)} ago`;
+    el("peer").innerHTML =
+      `<div class="stampmini" style="color:var(--${pl})">${word}</div>` +
+      `<p class="line">Checked in <b class="${ageL === "ok" ? "" : ageL}">${upfmt(age)} ago</b> · ${prun} of ${cts.length} containers running</p>` +
+      `<div class="rows">` +
+      row("Uptime", upfmt(Number(p.uptime_s) || 0)) +
+      row("CPU", ((Number(p.cpu) || 0) * 100).toFixed(1) + "%") +
+      row("Memory", `${gib(p.mem_used || 0)} / ${gib(p.mem_total || 0)} GiB`) +
+      row("Backup disk", bk.length ? bk.map(x => `${esc(x.storage)} ${(100 * x.used / x.total).toFixed(0)}%`).join(", ") : "—") +
+      row("Last backup", !plb ? "—" : plb.status === "OK" ? `OK · ${upfmt(plbAge)} ago` : `failed · ${upfmt(plbAge)} ago`,
+        !plb ? "" : plb.status === "OK" ? "ok" : "crit") +
+      (() => {
+        const pi = p.internet; if(!pi) return "";
+        const ls = pi.last;
+        const slow = ls && !ls.error && pi.typical_down && ls.down < pi.typical_down * 0.5;
+        return row("Internet", !ls ? "no speed test yet" : ls.error ? "speed test failed"
+            : `${Number(ls.down).toFixed(0)} down · ${Number(ls.up).toFixed(1)} up`,
+          !ls ? "" : ls.error || slow ? "warn" : "",
+          ls && ls.t ? `tested ${upfmt(now - ls.t)} ago` + (pi.outage_minutes ? ` · ${esc(pi.outage_minutes)} outage min today` : "") : "");
+      })() +
+      row("Failed units", failed.length ? failed.map(esc).join(", ") : "none", failed.length ? "crit" : "ok") +
+      row("Its alerts", pdown.length ? pdown.map(esc).join(", ") + " down" : "all up", pdown.length ? "crit" : "ok") +
+      `</div><p class="cts">${esc(p.pve)}<br>${cts.map(c => `${esc(c.vmid)} ${esc(c.name)} <span class="${c.status === "running" ? "" : "warn"}">${esc(c.status)}</span>`).join(" · ")}</p>` +
+      (dash ? `<a class="open" href="${esc(dash)}" target="_blank" rel="noopener">Open its report ${icon("out")}</a>` : "");
+  }
+
+  /* ---- The verdict ---- */
+  const lvl = worst(notes.map(x => x[0]));
+  const word = lvl === "ok" ? "CLEAN" : lvl === "warn" ? "NOTES" : "HOLD";
+  const stamp = el("stamp");
+  stamp.dataset.s = lvl === "ok" ? "ok" : lvl === "warn" ? "notes" : "hold";
+  stamp.innerHTML = `${word}<small>${new Date().toLocaleDateString([], {month:"short", day:"numeric"}).toUpperCase()}</small>`;
+  stamp.setAttribute("aria-label", "Verdict: " + word.toLowerCase());
+  if(word !== lastVerdict){
+    if(lastVerdict){ stamp.classList.remove("restamp"); void stamp.offsetWidth; stamp.classList.add("restamp"); }
+    lastVerdict = word;
+  }
+  if(lvl === "ok"){
+    el("sentence").innerHTML = `<strong>Clean show.</strong> ${probed.length} of ${probed.length} links answering, ` +
+      `${running} of ${lxc.length} containers running, last backup ${lb && lb.status === "OK" ? "OK " + upfmt(now - (lb.endtime || lb.starttime)) + " ago" : "running"}` +
+      (peerLine ? `, ${peerLine}.` : ".");
+    el("notes").innerHTML = "";
+  }else{
+    const nc = notes.filter(x => x[0] === "crit").length;
+    el("sentence").innerHTML = `<strong>${notes.length} note${notes.length > 1 ? "s" : ""}</strong> for this report` +
+      (nc ? `, ${nc} needing attention.` : ", nothing down.");
+    notes.sort((a, b) => RANK[b[0]] - RANK[a[0]]);
+    el("notes").innerHTML = notes.map(([l, dept, text]) =>
+      `<li class="${l === "crit" ? "c" : "w"}">` +
+      `<b>${l === "crit" ? `<span class="ring">${esc(dept)}</span>` : esc(dept)}</b>` +
+      `<span title="${esc(text)}"${l === "crit" ? "" : ' class="grease"'}>${esc(text.length > 110 ? text.slice(0, 107) + "…" : text)}</span></li>`).join("");
+  }
+  el("ver").textContent = BOX.product + " v" + (d.version || "?");
+  syncAllBtn();
+}
+
+/* Stale clock: the page says so when the last good read is getting old. */
+setInterval(() => {
+  if(!lastOk) return;
+  const age = (Date.now() - lastOk) / 1000;
+  if(age > 15 && !el("clock").querySelector(".dead")) el("clock").innerHTML = `<span class="stale">${Math.round(age)}s old</span>`;
+}, 1000);
+
+/* Drag to reorder the links. Native HTML5 drag: a flat list in one container
+   is the case the platform already handles. */
+let reordering = false, dragRow = null;
+el("reorder").onclick = () => {
+  reordering = !reordering;
+  el("svcs").classList.toggle("reorder", reordering);
+  for(const r of el("svcs").children) r.draggable = reordering;
+  el("reorder").textContent = reordering ? "Done" : "Reorder";
+  if(!reordering) tick();
+};
+el("svcs").addEventListener("dragstart", ev => {
+  dragRow = ev.target.closest(".svc"); if(!dragRow) return;
+  dragRow.classList.add("dragging");
+  ev.dataTransfer.effectAllowed = "move";
+  ev.dataTransfer.setData("text/plain", "");
+});
+el("svcs").addEventListener("dragover", ev => {
+  if(!dragRow) return;
+  ev.preventDefault();
+  const over = ev.target.closest(".svc");
+  if(!over || over === dragRow) return;
+  const r = over.getBoundingClientRect();
+  over.parentNode.insertBefore(dragRow, ev.clientY < r.top + r.height / 2 ? over : over.nextSibling);
+});
+el("svcs").addEventListener("dragend", () => {
+  if(!dragRow) return;
+  dragRow.classList.remove("dragging"); dragRow = null;
+  try{ localStorage.svcOrder = JSON.stringify([...el("svcs").children].map(c => c.dataset.name)); }catch(e){}
+});
+
+tick();
+setInterval(tick, 5000);
+loadHistory();
+setInterval(loadHistory, 60000);
+</script></body></html>

@@ -54,7 +54,7 @@ if [ -d "$REPO/ops/dist" ]; then
   done
   # The page is plain HTML beside dist/ (page.ts reads ../page.html), plus
   # self-hosted fonts.
-  for f in page.html login.html; do
+  for f in page.html login.html classic.html; do
     pct push 102 "$REPO/ops/$f" "/opt/pve-ops/$f" --perms 644 || ok=0
   done
   pct exec 102 -- mkdir -p /opt/pve-ops/fonts
