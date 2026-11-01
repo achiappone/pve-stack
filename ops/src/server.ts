@@ -8,7 +8,7 @@ import { VERSION } from "./version.js";
 import { clearDowns, getDowns, readHistory, sampleLoop } from "./history.js";
 import type {
   ActionBody, ActionName, DiskEntry, HostMetrics, LxcEntry,
-  NodeStatus, PrinterSummary, ProbeResult, ServiceEntry, Snapshot, StorageEntry, TaskEntry,
+  NodeStatus, PrinterSummary, ProbeResult, ServiceEntry, Snapshot, StorageEntry, TaskEntry, CtNic,
 } from "./types.js";
 
 /** Which container serves what. Not derivable from the PVE API - it knows the
@@ -85,6 +85,30 @@ function sessionOk(req: IncomingMessage): boolean {
   return false;
 }
 
+/** Each container's network cards: which bridge, and the address it really
+ *  has (from the running container, so DHCP leases show too). Cached for a
+ *  minute: it changes rarely and costs two API calls per container. */
+let ctnetCache: { t: number; data: Record<string, CtNic[]> } = { t: 0, data: {} };
+async function containerNets(n: string): Promise<Record<string, CtNic[]>> {
+  if (Date.now() - ctnetCache.t < 60_000) return ctnetCache.data;
+  const out: Record<string, CtNic[]> = {};
+  for (const c of await pve<LxcEntry[]>(`/nodes/${n}/lxc`)) {
+    const cfg = await pve<Record<string, unknown>>(`/nodes/${n}/lxc/${c.vmid}/config`);
+    const live = c.status === "running"
+      ? await pve<Array<{ name?: string; inet?: string }>>(`/nodes/${n}/lxc/${c.vmid}/interfaces`).catch(() => [])
+      : [];
+    out[String(c.vmid)] = Object.entries(cfg)
+      .filter(([k, v]) => /^net\d+$/.test(k) && typeof v === "string")
+      .map(([, v]) => {
+        const f = Object.fromEntries(String(v).split(",").map((x) => x.split("=") as [string, string]));
+        const l = live.find((i) => i.name === f["name"]);
+        return { name: f["name"] ?? "", bridge: f["bridge"] ?? "", ip: l?.inet ?? f["ip"] ?? "" };
+      });
+  }
+  ctnetCache = { t: Date.now(), data: out };
+  return out;
+}
+
 async function snapshot(): Promise<Snapshot> {
   // downs is a plain in-memory read, so it belongs here and not in the
   // parallel jobs below - there is nothing to await and nothing to fail.
@@ -100,6 +124,7 @@ async function snapshot(): Promise<Snapshot> {
       out.lxc = l.sort((a, b) => a.vmid - b.vmid);
     }],
     ["exporter", async () => { out.host = await hostMetrics(); }],
+    ["container networks", async () => { out.ctnet = await containerNets(n); }],
     // A printer that is switched off is normal, not an error worth surfacing -
     // so this one swallows its failure and simply leaves the row without a
     // summary, rather than pushing a line into the error banner every 5s.

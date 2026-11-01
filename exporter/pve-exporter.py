@@ -86,6 +86,16 @@ def network():
     """Bridge membership and link state - the dongle dropping out of vmbr0 is
     how the wired path died, and it is invisible from inside a container."""
     out = {"bridges": {}, "links": {}}
+    # The host's own IPv4 per interface ("10.10.10.1/24"), so the map can say
+    # which network each bridge is.
+    addrs = {}
+    try:
+        for line in subprocess.run(["ip", "-4", "-o", "addr", "show"], capture_output=True, text=True, timeout=5).stdout.splitlines():
+            f = line.split()
+            if len(f) >= 4:
+                addrs.setdefault(f[1], f[3])
+    except Exception:
+        pass
     for b in glob.glob("/sys/class/net/*/brif"):
         br = b.split("/")[-2]
         try:
@@ -110,7 +120,7 @@ def network():
         out["links"][n] = {"oper": oper, "carrier": read(f"{i}/carrier", "?"),
                            "rx": int(rx) if rx and rx.isdigit() else None,
                            "tx": int(tx) if tx and tx.isdigit() else None,
-                           "wireless": os.path.isdir(f"{i}/wireless")}
+                           "wireless": os.path.isdir(f"{i}/wireless"), "addr": addrs.get(n)}
     return out
 
 

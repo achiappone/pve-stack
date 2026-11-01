@@ -8,5 +8,5 @@
  *  Single source of truth. The server substitutes it into the page and reports
  *  it on /api/snapshot, so "is what I am looking at the code I just deployed?"
  *  has an answer that does not require an ssh session. */
-export const VERSION = "2.00.001";
+export const VERSION = "2.01.001";
 //# sourceMappingURL=version.js.map

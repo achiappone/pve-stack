@@ -177,6 +177,12 @@ export interface HazeSummary {
   sensorOk: boolean;
 }
 
+export interface CtNic {
+  name: string;             // eth0
+  bridge: string;           // vmbr0
+  ip: string;               // "10.10.10.6/24", or "dhcp" when not running
+}
+
 export interface TaskEntry {
   upid?: string;
   type?: string;
@@ -199,6 +205,7 @@ export interface Snapshot {
   host?: HostMetrics;
   downs?: Record<string, DownRecord>;
   lastBackup?: TaskEntry | null;
+  ctnet?: Record<string, CtNic[]>;
   /** So a deploy can be confirmed from the API, not just by eye. */
   version?: string;
 }

@@ -131,6 +131,14 @@ h3.sub{margin:16px 0 4px;font-size:11px;font-weight:600;letter-spacing:.07em;tex
 /* network map */
 .mapwrap{overflow-x:auto;margin:0 -4px}
 #mapsvg svg{display:block;width:100%;min-width:640px;height:auto}
+#mapsvg svg .st{transition:opacity .15s var(--ease)}
+#mapsvg svg:has(.st:hover) .st:not(:hover){opacity:.22}
+.conns .r .v{white-space:normal;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.nic{display:inline-flex;align-items:center;gap:6px;font:12px var(--mono);color:var(--strong);background:var(--panel-2);
+  border:1px solid var(--line-2);border-radius:7px;padding:2px 8px}
+.nic i{width:8px;height:8px;border-radius:2px;flex:none}
+.brnote{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px;color:var(--muted);margin:2px 0 8px}
+.brnote b{color:var(--strong);font-weight:600;display:inline-flex;align-items:center;gap:6px}
 .mlab{font:500 12px "Geist",sans-serif;fill:var(--text)}
 .mlab.strong{fill:var(--strong);font-weight:600}
 .mrate{font:11px "Geist Mono",monospace;fill:var(--muted)}
@@ -160,11 +168,18 @@ details.ifaces[open] summary::before{transform:rotate(45deg)}
 .chartbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
 .charts{position:relative;touch-action:pan-y}
 .chart{width:100%;height:auto;display:block}
-.chart text{font:10.5px "Geist Mono",monospace;fill:var(--faint)}
+.chart text{font:11.5px "Geist Mono",monospace;fill:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+.chip{font:500 12px "Geist",sans-serif;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:999px;
+  padding:3px 10px;display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--c);opacity:.3}
+.chip.on{color:var(--strong);border-color:color-mix(in srgb,var(--c) 55%,transparent)} .chip.on i{opacity:1}
+.chip:hover{border-color:var(--c)}
 .clegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;margin:6px 0 2px;color:var(--muted)}
 .clegend i{display:inline-block;width:12px;height:2px;vertical-align:4px;margin-right:6px}
 .clegend b{color:var(--strong);font:500 12px var(--mono)}
-.readout{position:absolute;top:24px;pointer-events:none;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+.readout b{color:var(--strong);font-weight:600}
+.readout{position:absolute;top:40px;pointer-events:none;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
   padding:6px 9px;font:12px/1.5 var(--mono);color:var(--text);white-space:nowrap;opacity:0;transition:opacity .12s}
 .readout.on{opacity:1}
 .log{margin:6px 0 0;padding:9px 11px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:8px;font:12px/1.5 var(--mono);max-height:180px;overflow:auto;white-space:pre-wrap}
@@ -220,7 +235,8 @@ footer{color:var(--faint);font-size:12px;padding:0 0 30px}
       <div class="ph"><h2>Network</h2><span class="sum" id="mapsum"></span><span class="right muted" style="font-size:12px">live traffic · updates every 5 s</span></div>
       <div class="mapwrap"><div id="mapsvg"></div></div>
       <div class="legend" id="maplegend"></div>
-      <details class="ifaces" open><summary>Interfaces</summary><div id="net"></div></details>
+      <h3 class="sub">Connections</h3><div class="brnote" id="brnote"></div><div class="conns" id="conns"></div>
+      <details class="ifaces"><summary>Interfaces</summary><div id="net"></div></details>
     </div>
     <aside class="side">
       <div class="panel" id="peerpanel"><div class="ph"><h2 id="peerh">Other box</h2><span class="right" id="peerstate"></span></div><div id="peer"><p class="muted">No check-in received yet.</p></div></div>
@@ -263,7 +279,9 @@ footer{color:var(--faint);font-size:12px;padding:0 0 30px}
    render when that box's server sends them. `wan` is the interface carrying
    this box's internet, for the traffic card. */
 const BOX = {name: "pve-code1", where: "Office", product: "Dev-Ops", accent: "#f472b6", accent2: "#a78bfa", peerAccent: "#2dd4bf",
-  wan: "wlp59s0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"}};
+  wan: "wlp59s0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"},
+  bridges: {vmbr0: ["lighting network", "containers' way out: the DMX fixtures, the K2 printer and the internet"],
+            vmbr1: ["internal · host only", "how the host's tunnel and the dashboard reach containers; nothing outside can reach it"]}};
 
 const el = id => document.getElementById(id);
 const gib = b => (b / 1073741824).toFixed(1);
@@ -383,7 +401,7 @@ function drawMap(d, rt){
   const xs = lxc.map((c, i) => lxc.length === 1 ? (x0 + x1) / 2 : x0 + (x1 - x0) * i / (lxc.length - 1));
   // Dense boxes (the office has seven containers): names stagger onto two rows
   // and shorten, and each link shows one total; the split is in the tooltip.
-  const gap = lxc.length > 1 ? (x1 - x0) / (lxc.length - 1) : 999, dense = gap < 130;
+  const gap = lxc.length > 1 ? (x1 - x0) / (lxc.length - 1) : 999, dense = gap < 130, tight = gap < 340;
   const maxChars = Math.max(6, Math.floor((dense ? gap * 2 : gap) / 7));
   const hostX = 70, hostY = midY;
   let g = "", top = "";
@@ -392,7 +410,10 @@ function drawMap(d, rt){
   brNames.forEach((b, i) => {
     const y = brY[b], c = brColor(i);
     g += `<path d="M${hostX + 26} ${hostY} C ${hostX + 70} ${hostY}, ${hostX + 60} ${y}, ${L} ${y} L ${x1 + 30} ${y}" stroke="${c}" stroke-width="3" fill="none" opacity=".55"/>`;
-    g += `<text class="mlab" x="${x1 + 38}" y="${y + 4}" fill="${c}" style="fill:${c}">${esc(b)}</text>`;
+    const role = (BOX.bridges[b] || [])[0], haddr = (links[b] || {}).addr;
+    g += `<text class="mlab strong" x="${x1 + 38}" y="${y - 2}" style="fill:${c}">${esc(b)}</text>` +
+      (role ? `<text class="mrate" x="${x1 + 38}" y="${y + 12}">${esc(role)}</text>` : "") +
+      (haddr ? `<text class="mrate" x="${x1 + 38}" y="${y + 25}">host ${esc(haddr)}</text>` : "");
     // physical ports on this bridge lead out to the internet / LAN
     const phys = (bridges[b] || []).filter(p => !/^(veth|tap|fwpr|fwln)/.test(p));
     phys.forEach((p, j) => {
@@ -405,34 +426,37 @@ function drawMap(d, rt){
   // the host's own uplinks that are not bridged (wifi at the office)
   const hostUp = Object.entries(links).filter(([k, v]) => !/^(veth|tap|fwpr|fwln|fwbr|vmbr|lo|tailscale|docker|br-)/.test(k) &&
     !brNames.some(b => (bridges[b] || []).includes(k)) && v.oper === "up");
+  // Laid out like the bridged ports: name, then down, then up, on their own
+  // lines, high enough to stay clear of the host box.
   hostUp.forEach(([k], j) => {
-    const r = rt[k], px = hostX - 22 + j * 22;
+    const r = rt[k], px = hostX - 30 + j * 22, ty = 30 + (hostY - 54) * 0.42;
     g += `<path d="M${px} ${hostY - 24} L ${px} 30" ${flowAttrs(r, getVar("--up"))}/>`;
-    g += `<text class="mlab strong" x="${px + 8}" y="${hostY - 50}">${esc(k)}${links[k].wireless ? " · wifi" : ""}</text>`;
-    if(r) g += `<text class="mrate" x="${px + 8}" y="${hostY - 36}">down ${mbps(r.rx)} · up ${mbps(r.tx)}</text>`;
+    g += `<text class="mlab strong" x="${px + 8}" y="${ty}">${esc(k)}${links[k].wireless ? " · wifi" : ""}</text>`;
+    if(r) g += `<text class="mrate" x="${px + 8}" y="${ty + 14}">down ${mbps(r.rx)}</text><text class="mrate" x="${px + 8}" y="${ty + 28}">up ${mbps(r.tx)}</text>`;
   });
   // internet strip across the top
   top += `<rect x="20" y="8" width="${W - 40}" height="22" rx="11" class="mnode"/>` +
     `<text class="mlab" x="34" y="23">Internet</text>`;
-  const cfX = W - 70;
-  top += `<text class="mlab" x="${cfX - 6}" y="23" text-anchor="end">Cloudflare</text>`;
+  const cfX = W - 26;          // the edge column: clear of the bridge labels
+  top += `<text class="mlab" x="${cfX - 10}" y="23" text-anchor="end">Cloudflare</text>`;
   // tunnel: host to Cloudflare
   g += `<path d="M${hostX + 10} ${hostY - 26} C ${hostX + 30} 70, ${cfX - 200} 50, ${cfX} 30" stroke="${getVar("--accent")}" stroke-width="2" fill="none" stroke-dasharray="6 6" opacity=".7"/>`;
   g += `<text class="mrate" x="${(hostX + cfX) / 2 + 60}" y="48" text-anchor="middle" style="fill:${getVar("--accent")}">tunnel: dashboard, Proxmox UI, SSH</text>`;
   // peer: Cloudflare down to the other box
   const p = h.peer, inet = h.internet || {};
-  const peerY = H - 30;
+  const peerY = H - 46;
   if(p && !p.error){
     const mine = ((inet.mirror || {}).pushes || []).slice(-1)[0], theirs = ((p.internet || {}).mirror || {}).push;
     g += `<path d="M${cfX} 30 L ${cfX} ${peerY - 18}" stroke="${getVar("--peer")}" stroke-width="2" fill="none" stroke-dasharray="6 6" opacity=".75"/>`;
-    g += `<rect x="${cfX - 62}" y="${peerY - 18}" width="124" height="34" rx="10" class="mnode" style="stroke:${getVar("--peer")}"/>` +
-      `<text class="mlab strong" x="${cfX}" y="${peerY + 4}" text-anchor="middle">${esc(p.host)}</text>`;
+    g += `<rect x="${cfX - 112}" y="${peerY - 18}" width="124" height="34" rx="10" class="mnode" style="stroke:${getVar("--peer")}"/>` +
+      `<text class="mlab strong" x="${cfX - 50}" y="${peerY + 4}" text-anchor="middle">${esc(p.host)}</text>`;
     const mt = [mine && mine.mbps ? `to ${Number(mine.mbps).toFixed(0)}` : "", theirs && theirs.mbps ? `from ${Number(theirs.mbps).toFixed(0)}` : ""].filter(Boolean).join(" · ");
-    if(mt) g += `<text class="mrate" x="${W - 10}" y="${peerY + 32}" text-anchor="end">mirror ${mt} Mb/s</text>`;
+    if(mt) g += `<text class="mrate" x="${cfX + 12}" y="${peerY + 34}" text-anchor="end">mirror ${mt} Mb/s</text>`;
   }
   // containers
   lxc.forEach((c, i) => {
     const x = xs[i], on = c.status === "running";
+    const gStart = g.length;
     const ports = brNames.map(b => [b, (bridges[b] || []).find(pt => new RegExp(`^veth${c.vmid}i\\d+$`).test(pt))]).filter(([, pt]) => pt);
     ports.forEach(([b, pt]) => {
       const y = brY[b], r = rt[pt];
@@ -442,12 +466,14 @@ function drawMap(d, rt){
       // Labels on the right half point left, clear of the other box's line.
       const right = x > (x0 + x1) / 2, ly = y < midY ? (y + midY) / 2 + 4 : (below + y) / 2 + 4;
       if(r && (r.rx + r.tx) * 8 / 1e6 >= 0.005) g += `<text class="mrate" x="${right ? x - 7 : x + 7}" y="${ly}" text-anchor="${right ? "end" : "start"}">` +
-        `<title>${esc(c.name)} on ${esc(b)}: ${mbps(r.tx)} in, ${mbps(r.rx)} out</title>${dense ? mbps(r.rx + r.tx) : `${mbps(r.tx)} in · ${mbps(r.rx)} out`}</text>`;
+        `<title>${esc(c.name)} on ${esc(b)}: ${mbps(r.tx)} in, ${mbps(r.rx)} out</title>${tight ? mbps(r.rx + r.tx) : `${mbps(r.tx)} in · ${mbps(r.rx)} out`}</text>`;
     });
     g += `<a href="#ct-${c.vmid}"><circle cx="${x}" cy="${midY}" r="13" fill="${on ? getVar("--panel-2") : getVar("--bg")}" stroke="${on ? getVar("--strong") : getVar("--faint")}" stroke-width="2.5"><title>${esc(c.vmid)} ${esc(c.name)} · ${esc(c.status)}</title></circle>` +
       `<text class="mlab strong" x="${x}" y="${midY + 4}" text-anchor="middle" style="font-size:10.5px;fill:${on ? getVar("--strong") : getVar("--faint")}">${esc(c.vmid)}</text>` +
       `<text class="mlab" x="${x}" y="${midY + 32 + (dense && i % 2 ? 15 : 0)}" text-anchor="middle" style="fill:${on ? getVar("--text") : getVar("--faint")}">` +
       `${esc(c.name.length > maxChars ? c.name.slice(0, maxChars - 1) + "…" : c.name)}</text></a>`;
+    // Everything drawn for this container is one group, so hovering it dims the rest.
+    g = g.slice(0, gStart) + `<g class="st">${g.slice(gStart)}</g>`;
   });
   // host node last, on top
   g += `<rect x="${hostX - 50}" y="${hostY - 24}" width="100" height="48" rx="12" class="mnode" style="stroke:${getVar("--accent")}"/>` +
@@ -461,72 +487,110 @@ function drawMap(d, rt){
 }
 const getVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-/* ---------------- thermal history chart ---------------- */
-const SERIES = ["var(--accent)", "#93c5fd", "#c4b5fd", "#fca5a5"];
-const CW = 720, CL = 36, CR = 8;
-let chartState = null;
-function chartSvg(rows, fmt, thresholds, H){
-  const keys = [];
-  for(const [, o] of rows) for(const k in o) if(keys.indexOf(k) < 0) keys.push(k);
-  const use = keys.slice(0, 4);
-  if(!use.length || rows.length < 2) return null;
+/* ---------------- history charts ---------------- */
+/* One clear line by default: the package temperature, smoothed, over a faint
+   trace of the raw samples. The cores track the package almost exactly, so
+   they are opt-in chips instead of four tangled lines. Drawn at the panel's
+   real pixel width, so the text is true size rather than a scaled-down 7px. */
+const SER = ["var(--accent)", "#93c5fd", "#c4b5fd", "#fca5a5", "#fcd34d", "#86efac", "#f9a8d4", "#67e8f9"];
+let chartPts = null, chartState = null, shown = {};
+try{ shown = JSON.parse(localStorage.chartSeries || "{}") || {}; }catch(e){}
+const niceStep = range => { const raw = range / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  return [1, 2, 5, 10].map(m => m * mag).find(s => raw <= s) || 10 * mag; };
+function smooth(vals, w){
+  return vals.map((v, i) => { if(typeof v !== "number") return null; let sum = 0, n = 0;
+    for(let j = Math.max(0, i - w); j <= Math.min(vals.length - 1, i + w); j++){ const x = vals[j]; if(typeof x === "number"){ sum += x; n++; } }
+    return n ? sum / n : null; });
+}
+function lineChart(pts, field, o){
+  const keys = [...new Set(pts.flatMap(p => Object.keys(p[field] || {})))];
+  if(!keys.length) return "";
+  const primary = keys.find(k => o.primary.test(k)) || keys[0];
+  let sel = (shown[field] || []).filter(k => keys.includes(k));
+  if(!sel.length) sel = [primary];
+  shown[field] = sel;
+  const W = Math.max(300, Math.round(el("charts").clientWidth)), H = o.height, L = 40, R = 14, T = 10, B = 24;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const w = Math.max(1, Math.round(pts.length / 50));
+  const series = sel.map(k => { const raw = pts.map(p => (p[field] || {})[k]); return {k, raw, sm: smooth(raw, w)}; });
   let lo = Infinity, hi = -Infinity;
-  for(const [, o] of rows) for(const k of use){ const v = o[k]; if(typeof v !== "number") continue; if(v < lo) lo = v; if(v > hi) hi = v; }
-  if(!isFinite(lo)) return null;
-  if(hi - lo < 1) hi = lo + 1;
-  const pad = (hi - lo) * .14; lo -= pad; hi += pad;
-  const T = 8, B = 18, t0 = rows[0][0], t1 = rows[rows.length - 1][0];
-  const px = t => CL + (CW - CL - CR) * (t1 === t0 ? 0 : (t - t0) / (t1 - t0));
-  const py = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  for(const s2 of series) for(const v of s2.raw) if(typeof v === "number"){ lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  if(!isFinite(lo)) return "";
+  const step = o.step || niceStep(Math.max(1, hi - lo));
+  lo = Math.floor((lo - step * .3) / step) * step; hi = Math.ceil((hi + step * .3) / step) * step;
+  if(o.floor != null) lo = Math.max(o.floor, lo);
+  const px = t => L + (W - L - R - 34) * ((t - t0) / ((t1 - t0) || 1));
+  const py = v => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
   let g = "";
-  for(let i = 0; i <= 2; i++){ const v = lo + (hi - lo) * i / 2, y = py(v).toFixed(1);
-    g += `<line x1="${CL}" y1="${y}" x2="${CW - CR}" y2="${y}" stroke="#1d2844"/><text x="${CL - 6}" y="${(py(v) + 4).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`; }
-  for(const [tv, c] of (thresholds || [])) if(tv >= lo && tv <= hi)
-    g += `<line x1="${CL}" y1="${py(tv).toFixed(1)}" x2="${CW - CR}" y2="${py(tv).toFixed(1)}" stroke="var(--${c})" stroke-dasharray="5 4" opacity=".6"/>`;
-  let paths = "", legend = "";
-  use.forEach((k, i) => {
-    const c = SERIES[i % SERIES.length]; let dd = "", pen = false, last = null;
-    for(const [t, o] of rows){ const v = o[k]; if(typeof v !== "number"){ pen = false; continue; }
-      dd += (pen ? "L" : "M") + px(t).toFixed(1) + " " + py(v).toFixed(1) + " "; pen = true; last = v; }
-    paths += `<path d="${dd}" fill="none" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/>`;
-    legend += `<span><i style="background:${c}"></i>${esc(tlabel(k))} <b>${last === null ? "" : fmt(last)}</b></span>`;
+  for(let v = lo; v <= hi + 1e-9; v += step)
+    g += `<line x1="${L}" x2="${W - R}" y1="${py(v).toFixed(1)}" y2="${py(v).toFixed(1)}" stroke="#1d2844"/>` +
+         `<text x="${L - 8}" y="${(py(v) + 4).toFixed(1)}" text-anchor="end">${Math.round(v)}${o.unitShort}</text>`;
+  const span = t1 - t0, tstep = [600, 1800, 3600, 7200, 10800, 21600, 43200, 86400].find(x => span / x <= 6) || 86400;
+  const fmtT = t => tstep >= 86400 ? new Date(t * 1000).toLocaleDateString([], {weekday:"short"})
+    : new Date(t * 1000).toLocaleTimeString([], tstep < 3600 ? {hour:"numeric", minute:"2-digit"} : {hour:"numeric"});
+  for(let t = Math.ceil(t0 / tstep) * tstep; t <= t1; t += tstep)
+    g += `<line x1="${px(t).toFixed(1)}" x2="${px(t).toFixed(1)}" y1="${T}" y2="${H - B}" stroke="#18223b"/>` +
+         `<text x="${px(t).toFixed(1)}" y="${H - 6}" text-anchor="middle">${fmtT(t)}</text>`;
+  for(const [tv, c, lab] of (o.thresholds || [])) if(tv > lo && tv < hi)
+    g += `<line x1="${L}" x2="${W - R}" y1="${py(tv).toFixed(1)}" y2="${py(tv).toFixed(1)}" stroke="var(--${c})" stroke-dasharray="4 4" opacity=".75"/>` +
+         `<text x="${L + 6}" y="${(py(tv) - 5).toFixed(1)}" text-anchor="start" style="fill:var(--${c})">${lab} ${tv}${o.unitShort}</text>`;
+  const path = vals => { let d = "", pen = false;
+    vals.forEach((v, j) => { if(typeof v !== "number"){ pen = false; return; } d += (pen ? "L" : "M") + px(pts[j].t).toFixed(1) + " " + py(v).toFixed(1) + " "; pen = true; }); return d; };
+  series.forEach(s2 => {
+    const c = SER[keys.indexOf(s2.k) % SER.length];
+    if(series.length === 1){
+      g += `<path d="${path(s2.raw)}" fill="none" stroke="${c}" stroke-width="1" opacity=".22"/>`;
+      g += `<path d="${path(s2.sm)} L${px(t1).toFixed(1)} ${H - B} L${px(t0).toFixed(1)} ${H - B}Z" fill="${c}" opacity=".07"/>`;
+    }
+    g += `<path d="${path(s2.sm)}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lastRaw = [...s2.raw].reverse().find(v => typeof v === "number"), lastSm = [...s2.sm].reverse().find(v => typeof v === "number");
+    if(lastRaw != null) g += `<circle cx="${px(t1).toFixed(1)}" cy="${py(lastSm).toFixed(1)}" r="3.5" fill="${c}"/>` +
+      `<text x="${(px(t1) + 7).toFixed(1)}" y="${(py(lastSm) + 4).toFixed(1)}" style="fill:${c};font-weight:600">${Math.round(lastRaw)}${o.unitShort}</text>`;
   });
-  const lab = t => (t1 - t0) > 86400 ? new Date(t * 1000).toLocaleDateString([], {month:"short", day:"numeric"})
-    : new Date(t * 1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
-  return {html: `<div class="clegend">${legend}</div><svg viewBox="0 0 ${CW} ${H}" class="chart" role="img">${g}${paths}` +
-    `<text x="${CL}" y="${H - 4}">${lab(t0)}</text><text x="${CW - CR}" y="${H - 4}" text-anchor="end">${lab(t1)}</text>` +
-    `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--accent)" opacity="0"/></svg>`, keys: use};
+  const chips = keys.length > 1 ? `<div class="chips" data-field="${field}">${keys.map((k, i) =>
+    `<button type="button" class="chip${sel.includes(k) ? " on" : ""}" data-series="${esc(k)}" style="--c:${SER[i % SER.length]}" aria-pressed="${sel.includes(k)}"><i></i>${esc(tlabel(k))}</button>`).join("")}</div>` : "";
+  return {html: `${chips}<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="chart" data-field="${field}" role="img" aria-label="${esc(o.label)}">${g}` +
+    `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--strong)" opacity="0"/></svg>`, px, L, W, R, sel, field, unit: o.unit};
+}
+function drawCharts(){
+  const box = el("charts"), ro = el("readout");
+  if(!chartPts || chartPts.length < 2){
+    box.innerHTML = '<p class="muted">Collecting. A curve appears a few minutes after a restart.</p>'; box.appendChild(ro); chartState = null; return; }
+  const a = lineChart(chartPts, "temps", {primary: /Package|Composite/i, unit: "°C", unitShort: "°", step: 10, floor: 0, height: 200,
+    thresholds: [[70, "warn", "warm"], [85, "crit", "hot"]], label: "Temperature history"});
+  const b = lineChart(chartPts, "fans", {primary: /./, unit: " rpm", unitShort: "", height: 130, floor: 0, label: "Fan speed history"});
+  box.innerHTML = (a ? a.html : "") + (b ? `<div style="margin-top:12px">${b.html}</div>` : ""); box.appendChild(ro);
+  chartState = {a, b};
+  try{ localStorage.chartSeries = JSON.stringify(shown); }catch(e){}
 }
 async function loadHistory(){
-  let pts;
-  try{ const r = await fetch("/api/history?hours=" + el("s-range").value); if(r.status === 401){ location.reload(); return; } pts = await r.json(); }
+  try{ const r = await fetch("/api/history?hours=" + el("s-range").value); if(r.status === 401){ location.reload(); return; } chartPts = await r.json(); }
   catch(e){ return; }
-  const box = el("charts"), ro = el("readout");
-  if(!Array.isArray(pts) || pts.length < 2){
-    box.innerHTML = '<p class="muted">Collecting. A curve appears a few minutes after a restart.</p>'; box.appendChild(ro); chartState = null; return; }
-  const a = chartSvg(pts.map(s => [s.t, s.temps]), v => v.toFixed(0) + "°", [[70, "warn"], [85, "crit"]], 150);
-  const b = chartSvg(pts.map(s => [s.t, s.fans]), v => v.toFixed(0) + " rpm", null, 90);
-  box.innerHTML = (a ? a.html : "") + (b ? b.html : ""); box.appendChild(ro);
-  chartState = {pts, a}; el("chartnote").textContent = `${pts.length} samples · hover to read`;
+  el("chartnote").textContent = Array.isArray(chartPts) ? `${chartPts.length} samples · smoothed · hover to read` : "";
+  drawCharts();
 }
+el("charts").addEventListener("click", ev => {
+  const c = ev.target.closest(".chip"); if(!c) return;
+  const field = c.closest(".chips").dataset.field, k = c.dataset.series, cur = shown[field] || [];
+  shown[field] = cur.includes(k) ? (cur.length > 1 ? cur.filter(x => x !== k) : cur) : cur.concat(k);
+  drawCharts();
+});
 el("charts").addEventListener("pointermove", ev => {
-  if(!chartState) return;
-  const svgs = el("charts").querySelectorAll("svg.chart"); if(!svgs.length) return;
-  const r = svgs[0].getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * CW;
-  const {pts, a} = chartState, t0 = pts[0].t, t1 = pts[pts.length - 1].t;
-  const t = t0 + (t1 - t0) * Math.min(1, Math.max(0, (x - CL) / (CW - CL - CR)));
-  let best = pts[0]; for(const p of pts) if(Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
-  const bx = CL + (CW - CL - CR) * ((best.t - t0) / ((t1 - t0) || 1));
-  svgs.forEach(s => { const l = s.querySelector(".xh"); l.setAttribute("x1", bx); l.setAttribute("x2", bx); l.setAttribute("opacity", ".6"); });
-  const lines = [new Date(best.t * 1000).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"})];
-  for(const k of (a ? a.keys : [])) if(typeof best.temps[k] === "number") lines.push(`${esc(tlabel(k))} ${best.temps[k].toFixed(0)}°`);
-  for(const k in (best.fans || {})) lines.push(`${esc(k)} ${best.fans[k]} rpm`);
+  if(!chartState || !chartState.a || !chartPts) return;
+  const svg = el("charts").querySelector('svg.chart[data-field="temps"]'); if(!svg) return;
+  const {px, L, W, R} = chartState.a, rect = svg.getBoundingClientRect(), x = (ev.clientX - rect.left) * (W / rect.width);
+  let best = chartPts[0]; for(const p of chartPts) if(Math.abs(px(p.t) - x) < Math.abs(px(best.t) - x)) best = p;
+  el("charts").querySelectorAll(".xh").forEach(l => { l.setAttribute("x1", px(best.t)); l.setAttribute("x2", px(best.t)); l.setAttribute("opacity", ".35"); });
+  const lines = [new Date(best.t * 1000).toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"})];
+  for(const k of chartState.a.sel) if(typeof (best.temps || {})[k] === "number") lines.push(`${esc(tlabel(k))} <b>${best.temps[k].toFixed(0)}°C</b>`);
+  if(chartState.b) for(const k of chartState.b.sel) if(typeof (best.fans || {})[k] === "number") lines.push(`${esc(k)} <b>${best.fans[k]} rpm</b>`);
   const ro = el("readout"); ro.innerHTML = lines.join("<br>"); ro.classList.add("on");
   const bb = el("charts").getBoundingClientRect(), left = ev.clientX - bb.left;
   ro.style.left = (left > bb.width / 2 ? left - ro.offsetWidth - 12 : left + 12) + "px";
 });
 el("charts").addEventListener("pointerleave", () => { el("readout").classList.remove("on"); el("charts").querySelectorAll(".xh").forEach(l => l.setAttribute("opacity", "0")); });
 el("s-range").onchange = loadHistory;
+new ResizeObserver(() => { if(chartPts) drawCharts(); }).observe(el("charts"));
 
 /* ---------------- helpers for rows ---------------- */
 const fmtLeft = s => { s = Math.max(0, Math.round(s)); const hh = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return hh ? `${hh}h ${String(m).padStart(2, "0")}m` : `${m}m`; };
@@ -711,6 +775,17 @@ async function tick(){
     return row(`${esc(k)}${downTag(downs, "net:" + k)}${downTag(downs, "bridge:" + k)}`, `${esc(s.oper)}${r ? ` · ${mbps(r.rx)} in · ${mbps(r.tx)} out` : ""}`, s.oper === "up" ? "" : "dim");
   }).join("");
   drawMap(d, rt);
+  // Who is on which network, and why a container has two cards.
+  const brNames2 = Object.keys(net.bridges || {}).sort(), brCol = b => [getVar("--br0"), getVar("--br1"), "#34d399"][brNames2.indexOf(b)] || getVar("--muted");
+  el("brnote").innerHTML = brNames2.map(b => { const role = BOX.bridges[b] || [];
+    return `<b><i class="nic" style="padding:0;border:0;background:none"><i style="background:${brCol(b)}"></i></i>${esc(b)}</b><span>${esc(role[0] || "")}${role[1] ? " — " + esc(role[1]) : ""}${(net.links[b] || {}).addr ? ` · host ${esc(net.links[b].addr)}` : ""}</span>`; }).join("");
+  const ctnet = d.ctnet || {};
+  el("conns").innerHTML = lxc.map(c => { const nics = ctnet[String(c.vmid)] || [];
+    return row(`<span class="mono" style="color:var(--accent)">${c.vmid}</span> ${esc(c.name)}`,
+      nics.map(nc => `<span class="nic"><i style="background:${brCol(nc.bridge)}"></i>${esc(nc.bridge)} · ${esc(nc.name)} · ${esc(nc.ip || "—")}</span>`).join("") || '<span class="muted">no network</span>',
+      "", (() => { if(nics.length < 2) return "";
+        const inner = nics.find(nc => /host only/i.test((BOX.bridges[nc.bridge] || [])[0] || "")), outer = nics.find(nc => nc !== inner);
+        return inner && outer ? `out through ${esc(outer.bridge)}, reached by the host through ${esc(inner.bridge)}` : ""; })()); }).join("");
   el("mapsum").textContent = `${Object.keys(net.bridges || {}).length} bridges · ${running} containers up`;
 
   /* Internet (home box today; any box running netwatch) */
