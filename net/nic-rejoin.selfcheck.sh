@@ -39,38 +39,54 @@ refute() {
 echo "nic-rejoin self-check"
 
 refute "healthy -> touches nothing" "WOULD:" \
-  env DRY_RUN=1 FAKE_IN_BRIDGE=yes FAKE_GW_OK=yes bash "$SUT"
+  env DRY_RUN=1 FAKE_IN_BRIDGE=yes FAKE_LINK_ALIVE=yes bash "$SUT"
 
 check "nic present, outside the bridge -> rejoins" "WOULD: ip link set nic0 master vmbr0" \
-  env DRY_RUN=1 FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+  env DRY_RUN=1 FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_LINK_ALIVE=no bash "$SUT"
 
 check "nic absent -> rescans the pci bus" "/sys/bus/pci/rescan" \
-  env DRY_RUN=1 FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+  env DRY_RUN=1 FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_LINK_ALIVE=no bash "$SUT"
 
 refute "nic absent -> does NOT try to add a device that is not there" "ip link set nic0 master" \
-  env DRY_RUN=1 FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+  env DRY_RUN=1 FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_LINK_ALIVE=no bash "$SUT"
 
-check "in bridge but gateway dead -> bounces the link" "WOULD: ip link set nic0 down" \
-  env DRY_RUN=1 FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=yes FAKE_GW_OK=no bash "$SUT"
+check "in bridge but nothing received -> bounces the link" "WOULD: ip link set nic0 down" \
+  env DRY_RUN=1 FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=yes FAKE_LINK_ALIVE=no bash "$SUT"
 
 C=$(mktemp -u /tmp/nic-rejoin-selfcheck.XXXXXX)
 
 rm -f "$C"
 refute "absent, first check -> rescans but does NOT rebind yet" "unbind" \
-  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_LINK_ALIVE=no bash "$SUT"
 
 echo 2 > "$C"
 check "absent, third check -> escalates to a controller rebind" "unbind" \
-  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=no FAKE_IN_BRIDGE=no FAKE_LINK_ALIVE=no bash "$SUT"
 
 echo 9 > "$C"
 refute "nic ALIVE -> never rebinds the controller, whatever the counter says" "unbind" \
-  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_LINK_ALIVE=no bash "$SUT"
 
 echo 9 > "$C"
 check "nic back -> clears the escalation counter" "rm -f" \
-  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_GW_OK=no bash "$SUT"
+  env DRY_RUN=1 COUNT="$C" FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=no FAKE_LINK_ALIVE=no bash "$SUT"
 rm -f "$C"
+
+# The real rx counter, against a fake sysfs. No gateway involved: this has to
+# hold on the Art-Net network, where the host has no address to ping from.
+T=$(mktemp -d /tmp/nic-rejoin-selfcheck.XXXXXX)
+mkdir -p "$T/nic0/statistics"
+rx() { echo "$1" > "$T/nic0/statistics/rx_packets"; }
+run_rx() { env DRY_RUN=1 NET_SYS="$T" RX_STATE="$T/rx" FAKE_NIC_EXISTS=yes FAKE_IN_BRIDGE=yes bash "$SUT"; }
+
+rx 1000
+refute "first reading after boot -> nothing to compare, leaves the link alone" "WOULD:" run_rx
+rx 1300
+refute "packets arriving -> leaves the link alone" "WOULD:" run_rx
+check  "no packets since the last tick -> bounces" "WOULD: ip link set nic0 down" run_rx
+rx 5
+refute "counter reset by a re-enumeration -> counts as traffic" "WOULD:" run_rx
+rm -rf "$T"
 
 echo
 if [ "$fails" -eq 0 ]; then echo "all checks passed"; else echo "$fails check(s) failed"; exit 1; fi

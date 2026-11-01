@@ -35,7 +35,7 @@ export const config = {
     // Moonraker on the printer. Read directly rather than through the K2
     // dashboard, which sits behind its own login - this only needs the two
     // objects below and they are unauthenticated on the printer itself.
-    printerUrl: pick("PRINTER_URL", "http://10.20.5.28:7125"),
+    printerUrl: pick("PRINTER_URL", "http://2.0.0.125:7125"),
     // The hazer's own web UI, behind HTTP basic auth. No default credentials
     // here on purpose: with none set the summary is simply skipped, which is
     // better than shipping this repo with the board's password in it.

@@ -25,11 +25,13 @@ installed from upstream releases rather than from this repo, but each binds only
 its vmbr1 address, so the ops tunnel is the one way in and nothing of theirs is
 on the office LAN.
 
-Backups go to a USB disk mounted at `/mnt/backup`, registered as the
-`backup-usb` storage with `is_mountpoint 1` - without that flag a run while the
-disk is unmounted writes into the empty directory and fills the root
-filesystem. The fstab entry is `nofail`: this host has no remote hands, and a
-USB disk that fails to appear must never hold up boot.
+Backups go to a 128G SD card (ext4, label `pve-backup-sd`) in the built-in
+reader, mounted at `/mnt/backup` and registered as the `backup-sd` storage with
+`is_mountpoint 1` - without that flag a run while the card is unmounted writes
+into the empty directory and fills the root filesystem. The fstab entry is
+`nofail`: this host has no remote hands, and a card that fails to appear must
+never hold up boot. It replaced the USB disk below, which went missing on
+2026-09-09; the job then failed quietly every night until 2026-09-30.
 
 The K2 printer dashboard itself lives in its own repo,
 `github.com/achiappone/k2plus-dashboard`, and is deployed by `deploy/k2-deploy`.

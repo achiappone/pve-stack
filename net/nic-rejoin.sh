@@ -22,8 +22,10 @@ set -u
 
 NIC=${NIC:-nic0}
 BRIDGE=${BRIDGE:-vmbr0}
-LAN_GW=${LAN_GW:-10.20.1.1}
 DRY_RUN=${DRY_RUN:-0}
+# Last rx_packets reading, so each tick can tell whether anything arrived since.
+RX_STATE=${RX_STATE:-/run/nic-rejoin.rx}
+NET_SYS=${NET_SYS:-/sys/class/net}   # overridable for the self-check
 
 # The controller everything hangs off. Specific to this machine: the Anker hub
 # is in the USB-C port, which is Alpine Ridge, and that is the part that fails.
@@ -48,15 +50,28 @@ in_bridge() {
   [ -e "/sys/class/net/$BRIDGE/brif/$NIC" ]
 }
 
-gateway_ok() {
-  if [ -n "${FAKE_GW_OK+x}" ]; then [ "$FAKE_GW_OK" = yes ]; return; fi
-  ping -c1 -W2 -I "$BRIDGE" "$LAN_GW" >/dev/null 2>&1
+# Is the wire actually carrying traffic? Received packets since the last tick,
+# not a gateway ping. Until 2026-09-30 this pinged 10.20.1.1; then the port was
+# moved onto the Art-Net lighting network (2.0.0.0/8), where the host has no
+# address and no gateway can answer it, so it bounced the lighting link 40 times
+# in six minutes. A counter works on any network: the lighting side receives
+# ~300 packets/s and the office LAN is never silent for 20s either.
+#
+# The first reading after boot, or after the state file is lost, counts as
+# alive - there is nothing to compare it with yet.
+link_alive() {
+  if [ -n "${FAKE_LINK_ALIVE+x}" ]; then [ "$FAKE_LINK_ALIVE" = yes ]; return; fi
+  local now prev
+  now=$(cat "$NET_SYS/$NIC/statistics/rx_packets" 2>/dev/null) || return 1
+  prev=$(cat "$RX_STATE" 2>/dev/null || echo "")
+  echo "$now" > "$RX_STATE"
+  [ -z "$prev" ] || [ "$now" != "$prev" ]
 }
 
 main() {
   # The healthy path has to be cheap and silent - this runs on every udev net
   # event and every timer tick.
-  if in_bridge && gateway_ok; then
+  if in_bridge && link_alive; then
     return 0
   fi
 
@@ -101,10 +116,10 @@ main() {
     return 0
   fi
 
-  # In the bridge but the gateway does not answer. Bouncing the link is the
-  # cheapest thing that fixes a port stuck after a re-enumeration, and it is
+  # In the bridge but nothing received for a whole tick. Bouncing the link is
+  # the cheapest thing that fixes a port stuck after a re-enumeration, and it is
   # safe: if this was not the problem, the next tick tries again.
-  log "$NIC is in $BRIDGE but $LAN_GW is unreachable; bouncing the link"
+  log "$NIC is in $BRIDGE but received nothing since the last check; bouncing the link"
   run ip link set "$NIC" down
   run ip link set "$NIC" up
   run ip link set "$NIC" master "$BRIDGE"

@@ -32,7 +32,7 @@ import asyncio, base64, logging, os, time
 from aiohttp import web
 from playwright.async_api import async_playwright
 
-PRINTER  = os.environ.get("PRINTER_HOST", "10.20.5.28")
+PRINTER  = os.environ.get("PRINTER_HOST", "2.0.0.125")
 CAM_PORT = int(os.environ.get("CAM_PORT", "8000"))
 BIND     = os.environ.get("CAM_BIND", "127.0.0.1")
 PORT     = int(os.environ.get("CAM_RELAY_PORT", "8771"))
