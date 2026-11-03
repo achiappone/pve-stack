@@ -147,7 +147,10 @@ pointed at it.
   10.20.1.43/24). From 2026-09-30, when the wire moved to Art-Net, until then,
   the failover still probed the old office router 10.20.1.1, so the host sat
   on wifi for a month. DNS is set through Proxmox (node -> System -> DNS):
-  1.1.1.1, 8.8.8.8, then Chauvet's 10.10.1.4 last. Chauvet's servers do not
+  1.1.1.1, 8.8.8.8, then Chauvet's 10.10.1.4 last. After any DNS change, run
+  `systemctl restart postfix`: its chroot keeps its own copy of
+  `resolv.conf`, and the stale copy (Chauvet's servers only) held every email
+  in the queue from 2026-11-01 until it was noticed on 11-03. Chauvet's servers do not
   answer over the lighting network, and the public ones answer over both
   paths. Nothing blocks the lighting network from reaching 2.0.0.43; that was
   the user's choice. `/etc/network/interfaces` is not in this repo; the
