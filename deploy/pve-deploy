@@ -149,6 +149,16 @@ if [ -d "$REPO/peer" ]; then
     && echo "ok: peer-sync + uptime-alert + netwatch timers armed"
 fi
 
+# K2 printer watchdog: follows the printer between the lighting network and its
+# wifi fallback and keeps CT 101 / CT 102 pointed at it (printer/k2-watch.py).
+if [ -f "$REPO/printer/k2-watch.py" ]; then
+  install -m755 "$REPO/printer/k2-watch.py" /usr/local/sbin/k2-watch.py
+  install -m644 "$REPO/printer/k2-watch.conf" /etc/k2-watch.conf
+  install -m644 "$REPO/systemd/k2-watch.service" "$REPO/systemd/k2-watch.timer" /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now k2-watch.timer >/dev/null 2>&1 && echo "ok: k2-watch.timer armed"
+fi
+
 install -m755 "$REPO/exporter/pve-exporter.py" /usr/local/sbin/pve-exporter.py && echo "ok: exporter"
 install -m644 "$REPO/systemd/pve-exporter.service" /etc/systemd/system/pve-exporter.service
 systemctl daemon-reload

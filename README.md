@@ -18,6 +18,7 @@ laptop that has already powered itself off unexpectedly once.
     modprobe.d/             module options             fan control, usb-storage quirks
     udev/                   device rules               backup enclosure autosuspend
     wifi/                   secondary path + failover  wifi-up/down, wifi-failover
+    printer/                k2-watch: finds the K2 printer and keeps CT 101/102 pointed at it
     net/                    NIC auto-rejoin            nic-rejoin + self-check
 
 Monitoring lives in 103 (beszel), 104 (uptime-kuma) and 105 (pulse). Those are
@@ -80,6 +81,33 @@ fixed allowlist of actions. Bridge membership used to be the whole access
 model, back when 102 was the only member; the monitoring containers sit there
 too now, and those are internet-facing, so the exporter checks the peer address
 against `EXPORTER_ALLOW` (102 alone) rather than trusting the bridge.
+
+## K2 printer watchdog
+
+`printer/k2-watch.py` runs on the host every minute (`k2-watch.timer`). It
+recognises the printer by its Moonraker hostname (`K2Plus-05E6`, in
+`printer/k2-watch.conf`) and keeps CT 101 (`PRINTER_HOST` in
+`/etc/k2-dashboard.env`) and CT 102 (`PRINTER_URL` in `/etc/pve-ops.env`)
+pointed at it.
+
+- **On the lighting network** (normal) it only rewrites those addresses when
+  the printer's DHCP address changes. Routing on the host stays **off**
+  (`vmbr0` and `wlp59s0` forwarding = 0). That also closes a path that existed
+  from 2026-11-01, when the host got 2.0.0.43: a lighting-network device could
+  route through it into vmbr1.
+- **On the office wifi** (the printer's fallback when its cable has no link;
+  it sat there from about 2026-10-30 to 11-03 with both dashboards blind) the
+  containers cannot reach it. The host routes them to the printer's address
+  and nothing else: each CT gets a `/32` route via 2.0.0.43, the host NATs it
+  out `wlp59s0`, and the `K2WATCH` chains drop every other routed packet in
+  or out of wifi or off the lighting network. It is routing, not a port
+  relay, so the WebRTC camera and the ssh repair actions work as well.
+- Every move is emailed. A printer that is switched off is not a move:
+  nothing changes. It searches known addresses (lighting first), then the
+  lighting /24 at most every 10 min, then the wifi /24 at most every 6 h
+  (it's the office network; sweeping it every minute would look like a port
+  scan). State lives in `/var/lib/k2-watch/state.json`, and
+  `k2-watch.py --selfcheck` tests the search order.
 
 ## Hard-won details
 

@@ -1,0 +1,8 @@
+[Unit]
+Description=Keep the K2 dashboards pointed at the K2 printer, wherever it is
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/k2-watch.conf
+ExecStart=/usr/local/sbin/k2-watch.py
