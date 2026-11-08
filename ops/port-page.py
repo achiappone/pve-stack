@@ -14,20 +14,20 @@ import sys
 
 src = sys.argv[1] if len(sys.argv) > 1 else "../home-devops/dashboard"
 
-OFFICE_BOX = '''const BOX = {name: "pve-code1", where: "Office", product: "Dev-Ops", accent: "#f472b6", accent2: "#a78bfa", peerAccent: "#2dd4bf",
+OFFICE_BOX = '''const BOX = {name: "pve-code1", where: "Office", product: "Chauvet DevOps", accent: "#f472b6", accent2: "#a78bfa", peerAccent: "#2dd4bf",
   wan: "nic0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"},
   bridges: {vmbr0: ["lighting network", "everyone's way out: the DMX fixtures, the K2 printer and the internet via 2.0.0.2 (the host falls back to wifi)"],
             vmbr1: ["internal · host only", "how the host's tunnel and the dashboard reach containers; nothing outside can reach it"]}};'''
 
 PAGE = [
-    ('<title>Home Dev-Ops · promox</title>', '<title>Dev-Ops · pve-code1</title>'),
-    ('<h1 id="boxname">promox</h1><span id="sub">Home Dev-Ops</span>', '<h1 id="boxname">pve-code1</h1><span id="sub">Dev-Ops</span>'),
+    ('<title>Home Dev-Ops · promox</title>', '<title>Chauvet DevOps · pve-code1</title>'),
+    ('<h1 id="boxname">promox</h1><span id="sub">Home Dev-Ops</span>', '<h1 id="boxname">pve-code1</h1><span id="sub">Chauvet DevOps</span>'),
 ]
 LOGIN = [
-    ('<title>Sign in · Home Dev-Ops · promox</title>', '<title>Sign in · Dev-Ops · pve-code1</title>'),
+    ('<title>Sign in · Home Dev-Ops · promox</title>', '<title>Sign in · Chauvet DevOps · pve-code1</title>'),
     ('--accent:#2dd4bf;--accent-2:#3b82f6;', '--accent:#f472b6;--accent-2:#a78bfa;'),
     ('<h1>promox</h1>', '<h1>pve-code1</h1>'),
-    ('<p class="sub">Home Dev-Ops. Sign in to see how this box is doing.</p>', '<p class="sub">Dev-Ops. Sign in to see how this box is doing.</p>'),
+    ('<p class="sub">Home Dev-Ops. Sign in to see how this box is doing.</p>', '<p class="sub">Chauvet DevOps. Sign in to see how this box is doing.</p>'),
 ]
 
 

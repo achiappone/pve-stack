@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Dev-Ops · pve-code1</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Chauvet DevOps · pve-code1</title>
 <style>
 /* Midnight: a dark operations console. The box's identity colour (BOX.accent)
    marks its logo and live elements; green / amber / red are reserved for state.
@@ -147,6 +147,10 @@ h3.sub{margin:16px 0 4px;font-size:11px;font-weight:600;letter-spacing:.07em;tex
 .flow.rev{animation-direction:reverse}
 .flow.idle{animation:none;stroke-dasharray:none;opacity:.35}
 @keyframes flow{to{stroke-dashoffset:-24}}
+/* a row reached from the network map: scrolled clear of the header and lit for a moment */
+.svc,.ct{scroll-margin-top:90px}
+.svc,.ct{transition:background .8s var(--ease)}
+.landed{background:color-mix(in srgb,var(--accent) 22%,transparent)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px;font-size:12px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
@@ -207,7 +211,7 @@ footer{color:var(--faint);font-size:12px;padding:0 0 30px}
 
 <header class="top"><div class="wrap top-in">
   <span class="logo" aria-hidden="true"></span>
-  <div class="ident"><h1 id="boxname">pve-code1</h1><span id="sub">Dev-Ops</span></div>
+  <div class="ident"><h1 id="boxname">pve-code1</h1><span id="sub">Chauvet DevOps</span></div>
   <nav class="tabs" aria-label="Sections">
     <a href="#map">Network</a><a href="#services">Services</a><a href="#containers">Containers</a>
     <a href="#host">Host</a><a href="#storage">Storage</a><a href="#thermals">Thermals</a></nav>
@@ -226,7 +230,7 @@ footer{color:var(--faint);font-size:12px;padding:0 0 30px}
     <div class="kpi"><small>CPU</small><b id="k-cpu">—</b><em id="k-cpu-d">&nbsp;</em><svg id="s-cpu" viewBox="0 0 200 34" preserveAspectRatio="none"></svg></div>
     <div class="kpi"><small>Memory</small><b id="k-mem">—</b><em id="k-mem-d">&nbsp;</em><svg id="s-mem" viewBox="0 0 200 34" preserveAspectRatio="none"></svg></div>
     <div class="kpi"><small>Package temperature</small><b id="k-tmp">—</b><em id="k-tmp-d">&nbsp;</em><svg id="s-tmp" viewBox="0 0 200 34" preserveAspectRatio="none"></svg></div>
-    <div class="kpi"><small>Internet traffic</small><b id="k-net">—</b><em id="k-net-d">&nbsp;</em><svg id="s-net" viewBox="0 0 200 34" preserveAspectRatio="none"></svg></div>
+    <div class="kpi"><small>Internet</small><b id="k-net">—</b><em id="k-net-d">&nbsp;</em><svg id="s-net" viewBox="0 0 200 34" preserveAspectRatio="none"></svg></div>
   </section>
 
   <section class="grid2">
@@ -239,7 +243,10 @@ footer{color:var(--faint);font-size:12px;padding:0 0 30px}
     </div>
     <aside class="side">
       <div class="panel" id="peerpanel"><div class="ph"><h2 id="peerh">Other box</h2><span class="right" id="peerstate"></span></div><div id="peer"><p class="muted">No check-in received yet.</p></div></div>
-      <div class="panel" id="internet" hidden><div class="ph"><h2>Internet</h2><button class="btn sm" id="b-speed" type="button"><svg class="i"><use href="#i-play"/></svg>Speed test</button></div><div id="inet"></div></div>
+      <div class="panel" id="internet" hidden><div class="ph"><h2>Internet</h2><button class="btn sm" id="b-speed" type="button"><svg class="i"><use href="#i-clear"/></svg>Update</button></div><div id="inet"></div></div>
+      <div class="panel" id="battpanel"><div class="ph"><span class="dot" id="d-batt"></span><h2>HUZZAH battery</h2><span class="sum" id="battsum"></span></div>
+        <div id="batt"><p class="muted">Not read yet.</p></div>
+        <svg class="chart" id="s-batt" viewBox="0 0 200 40" preserveAspectRatio="none" style="height:56px;margin-top:8px"></svg></div>
     </aside>
   </section>
 
@@ -277,7 +284,7 @@ footer{color:var(--faint);font-size:12px;padding:0 0 30px}
    copies. Office-only rows (printer, hazer, Dell profile, NIC rejoin, deploy)
    render when that box's server sends them. `wan` is the interface carrying
    this box's internet, for the traffic card. */
-const BOX = {name: "pve-code1", where: "Office", product: "Dev-Ops", accent: "#f472b6", accent2: "#a78bfa", peerAccent: "#2dd4bf",
+const BOX = {name: "pve-code1", where: "Office", product: "Chauvet DevOps", accent: "#f472b6", accent2: "#a78bfa", peerAccent: "#2dd4bf",
   wan: "nic0", rebootConfirm: "REBOOT-PVE-CODE1", nicRejoin: true, unitLabels: {camrelay: "K2 Plus camera (camrelay)"},
   bridges: {vmbr0: ["lighting network", "everyone's way out: the DMX fixtures, the K2 printer and the internet via 2.0.0.2 (the host falls back to wifi)"],
             vmbr1: ["internal · host only", "how the host's tunnel and the dashboard reach containers; nothing outside can reach it"]}};
@@ -332,9 +339,27 @@ document.addEventListener("click", ev => {
   doAction({do:act, ct}, `${act.replace("ct_", "")} ${ct}`, b);
 });
 el("b-logout").onclick = async () => { try{ await fetch("/api/logout", {method:"POST"}); }catch(e){} location.reload(); };
-el("b-speed").onclick = ev => {
-  if(!confirm("Run a speed test now?\n\nIt downloads and uploads about 450 MB.")) return;
-  doAction({do:"speedtest"}, "speed test", ev.target);
+// The test runs about a minute on the host; the button stays "Testing…" until a newer
+// result than the click shows up in the snapshot (tick() ends it), or 5 minutes pass.
+// A container clicked on the network map: scroll to its row and light it for 2.5 s.
+// A click handler, not :target, which would re-flash the row on every 5 s redraw.
+const landed = {id: "", until: 0};
+el("mapsvg").addEventListener("click", ev => {
+  const a = ev.target.closest("a[href^='#']"), row = a && document.getElementById(a.getAttribute("href").slice(1));
+  if(!row) return;
+  ev.preventDefault();
+  landed.id = row.id; landed.until = Date.now() + 2500;
+  row.scrollIntoView({behavior: "smooth", block: "center"});
+  row.classList.add("landed");
+  setTimeout(() => { const r = document.getElementById(landed.id); if(r) r.classList.remove("landed"); }, 2500);
+});
+let speedSince = 0, speedLogOpen = false;  // the log stays open across the 5 s redraw
+const speedBtn = () => { const b = el("b-speed"), on = speedSince && Date.now() - speedSince < 300000;
+  b.disabled = !!on; b.innerHTML = on ? "Testing…" : '<svg class="i"><use href="#i-clear"/></svg>Update'; };
+el("b-speed").onclick = async () => {
+  if(!confirm("Run a new speed test now?\n\nIt downloads and uploads about 450 MB and takes about a minute.")) return;
+  await doAction({do:"speedtest"}, "speed test");
+  speedSince = Date.now(); speedBtn();
 };
 el("b-deploy").onclick = ev => {
   if(!confirm("Pull the repo from GitHub and install it?\n\nThis restarts the dashboard and the exporter; the page will blink.")) return;
@@ -371,6 +396,16 @@ function spark(id, pts, color){
   const g = s.firstChild;
   requestAnimationFrame(() => requestAnimationFrame(() => { g.style.transition = `transform ${POLL_MS}ms linear`; g.style.transform = `translateX(${-step}px)`; }));
 }
+
+/* ---------------- HUZZAH battery ---------------- */
+const BATT_URL = "http://10.0.0.67/";
+// LiPo resting voltage (mV) at 0, 10, ... 100%: the sketch's and its page's CURVE.
+const BATT_CURVE = [3300, 3600, 3690, 3740, 3770, 3790, 3820, 3870, 3920, 4000, 4200];
+const battPct = mv => { if(mv <= BATT_CURVE[0]) return 0;
+  for(let i = 1; i < 11; i++) if(mv < BATT_CURVE[i]) return Math.floor((i - 1) * 10 + (mv - BATT_CURVE[i - 1]) * 10 / (BATT_CURVE[i] - BATT_CURVE[i - 1]));
+  return 100; };
+console.assert(battPct(3300) === 0 && battPct(3790) === 50 && battPct(3805) === 55 && battPct(4250) === 100, "battPct self-check failed");
+const battSeen = [];  // [ms, mV] over the last minute, this tab only: the charge trend
 
 /* ---------------- traffic rates ---------------- */
 let prevLinks = null, prevT = 0;
@@ -490,7 +525,9 @@ function drawMap(d, rt){
       if(r && (r.rx + r.tx) * 8 / 1e6 >= 0.005) g += `<text class="mrate" x="${right ? x - 7 : x + 7}" y="${ly}" text-anchor="${right ? "end" : "start"}">` +
         `<title>${esc(c.name)} on ${esc(b)}: ${mbps(r.tx)} in, ${mbps(r.rx)} out</title>${tight ? mbps(r.rx + r.tx) : `${mbps(r.tx)} in · ${mbps(r.rx)} out`}</text>`;
     });
-    g += `<a href="#ct-${c.vmid}"><circle cx="${x}" cy="${midY}" r="13" fill="${on ? getVar("--panel-2") : getVar("--bg")}" stroke="${on ? getVar("--strong") : getVar("--faint")}" stroke-width="2.5"><title>${esc(c.vmid)} ${esc(c.name)} · ${esc(c.status)}</title></circle>` +
+    // To its row under Services (the link it serves); no service: its row under Containers.
+    const svc = (d.services || []).some(s => s.ct === c.vmid);
+    g += `<a href="#${svc ? "svc-ct" : "ct-"}${c.vmid}"><circle cx="${x}" cy="${midY}" r="13" fill="${on ? getVar("--panel-2") : getVar("--bg")}" stroke="${on ? getVar("--strong") : getVar("--faint")}" stroke-width="2.5"><title>${esc(c.vmid)} ${esc(c.name)} · ${esc(c.status)}</title></circle>` +
       `<text class="mlab strong" x="${x}" y="${midY + 4}" text-anchor="middle" style="font-size:10.5px;fill:${on ? getVar("--strong") : getVar("--faint")}">${esc(c.vmid)}</text>` +
       `<text class="mlab" x="${x}" y="${midY + 32 + (dense && i % 2 ? 15 : 0)}" text-anchor="middle" style="fill:${on ? getVar("--text") : getVar("--faint")}">` +
       `${esc(c.name.length > maxChars ? c.name.slice(0, maxChars - 1) + "…" : c.name)}</text></a>`;
@@ -657,9 +694,12 @@ async function tick(){
   el("k-tmp").textContent = pkg ? pkg[1].toFixed(0) + "°C" : hottest ? hottest[1].toFixed(0) + "°C" : "—";
   el("k-tmp-d").textContent = hottest && pkg && hottest !== pkg ? `hottest ${hottest[0]} ${hottest[1].toFixed(0)}°` : "package";
   const inet = h.internet, lastSp = inet && (inet.speeds || []).slice(-1)[0];
-  el("k-net").textContent = wanR ? mbps(wanR.rx + wanR.tx) : "—";
-  el("k-net-d").textContent = (wanR ? `down ${mbps(wanR.rx)} · up ${mbps(wanR.tx)}` : `measuring ${BOX.wan}…`) +
-    (lastSp && !lastSp.error ? ` · tested ${lastSp.down.toFixed(0)}/${lastSp.up.toFixed(0)}` : "");
+  // What the line can do (the last speed test) over what this box is using right now (the sparkline):
+  // the live figure alone sat at a few kb/s and read like a slow connection.
+  const spOk = lastSp && !lastSp.error;
+  el("k-net").innerHTML = spOk ? `${lastSp.down.toFixed(0)} / ${lastSp.up.toFixed(0)} <small>Mb/s</small>` : "—";
+  el("k-net-d").innerHTML = (spOk ? `speed test, down / up · ${upfmt(now - lastSp.t)} ago` : "no speed test yet") +
+    `<br>in use now: ${wanR ? `down ${mbps(wanR.rx)} · up ${mbps(wanR.tx)}` : `measuring ${BOX.wan}…`}`;
   spark("s-cpu", hist.cpu, BOX.accent); spark("s-mem", hist.mem, "#93c5fd"); spark("s-tmp", hist.tmp, "#c4b5fd"); spark("s-net", hist.net, "#fbbf24");
 
   /* Services */
@@ -669,6 +709,7 @@ async function tick(){
   const rank = sv => { const i = saved.indexOf(sv.name); return i < 0 ? saved.length : i; };
   const probed = svcs.filter(s => probes[s.url] && !s.optional), svcDown = probed.filter(s => !probes[s.url].up);
   const offOpt = svcs.filter(s => s.optional && probes[s.url] && !probes[s.url].up);
+  const svcIds = new Set();
   if(!reordering) el("svcs").innerHTML = svcs.slice().sort((a, b) => rank(a) - rank(b)).map(sv => {
     const ct = sv.ct == null ? null : byId[String(sv.ct)], pr = probes[sv.url];
     const st = !pr ? "off" : pr.up ? "" : sv.optional ? "off" : "crit";
@@ -677,7 +718,9 @@ async function tick(){
       (sv.printer ? printerTag(d.printer) : sv.haze ? hazeTag(d.haze) : "");
     const name = sv.ssh ? `<span class="nm">${esc(sv.name)}</span>` : `<a href="${esc(sv.url)}"${sv.self ? "" : ' target="_blank" rel="noopener"'}>${esc(sv.name)}</a>`;
     const where = sv.external ? "offsite" : sv.host ? "host" : sv.ct == null ? "device" : ct ? `ct ${sv.ct}` : `ct ${sv.ct} missing`;
-    return `<div class="svc" data-name="${esc(sv.name)}" draggable="${reordering}"><span class="dot ${st}"></span>
+    const anchor = sv.ct != null && !svcIds.has(sv.ct) ? (svcIds.add(sv.ct), ` id="svc-ct${sv.ct}"`) : "";  // the map's container links land here
+    const lit = anchor && landed.id === `svc-ct${sv.ct}` && Date.now() < landed.until ? " landed" : "";
+    return `<div class="svc${lit}"${anchor} data-name="${esc(sv.name)}" draggable="${reordering}"><span class="dot ${st}"></span>
       <span>${name}${tags}<span class="d">${esc(sv.desc || "")}</span></span><span class="w">${where}</span>
       <span class="s">${!pr ? '<span class="muted">checking</span>' : pr.up ? `${pr.ms} ms` : sv.optional ? '<span class="muted">off</span>' : '<span class="crit">down</span>'}</span></div>`;
   }).join("") || '<p class="muted">No links configured.</p>';
@@ -811,6 +854,36 @@ async function tick(){
         return inner && outer ? `out through ${esc(outer.bridge)}, reached by the host through ${esc(inner.bridge)}` : ""; })()); }).join("");
   el("mapsum").textContent = `${Object.keys(net.bridges || {}).length} bridges · ${running} containers up`;
 
+  /* HUZZAH battery: same curve and states as its sketch and OLED (achiappone/huzzahBattery) */
+  el("battpanel").hidden = !d.huzzah;  // home only: the office server has no board to read
+  { const b = d.huzzah || {};
+    let bl = "off";
+    if(b.mv){
+      battSeen.push([Date.now(), b.mv]); while(battSeen[0][0] < Date.now() - 70000) battSeen.shift();
+      const was = battSeen[0][1], trend = Date.now() - battSeen[0][0] > 50000 ? (b.mv >= was + 10) - (b.mv + 10 <= was) : 0;
+      const pct = battPct(b.mv), state = b.mv >= 4180 ? "Full / top-off" : trend > 0 ? "Charging" : trend < 0 ? "On battery" : "Steady";
+      bl = b.mv < 3500 ? note("warn", "HUZZAH battery", `battery low, ${(b.mv / 1000).toFixed(2)} V`) : "ok";
+      el("battsum").textContent = state;
+      el("batt").innerHTML =
+        `<div class="big2"><div><small>Charge</small><b>${trend > 0 ? "~" : ""}${pct}%</b><small>${trend > 0 ? "reads high while charging" : "from the LiPo curve"}</small></div>` +
+        `<div><small>Voltage</small><b>${(b.mv / 1000).toFixed(3)} V</b><small>${b.mah} mAh cell</small></div></div>` +
+        row("WiFi", b.wifi ? `${b.rssi} dBm` : "down") + row("Up", upfmt(b.uptime || 0)) +
+        row("Top-off", b.topoff ? `${b.topoff} min at 4.2 V` : "not timed yet") +
+        row("Board", `<a href="${esc(BATT_URL)}" target="_blank" rel="noopener">its own page</a>`, "", "LAN only");
+      const v = (b.hist || {}).mv || [];
+      if(v.length > 1){
+        let lo = Math.min(...v), hi = Math.max(...v); if(hi - lo < 50){ lo = (lo + hi) / 2 - 25; hi = lo + 50; }
+        const xy = v.map((m, i) => [i * 200 / (v.length - 1), 37 - (m - lo) / (hi - lo) * 34]), dd = curve(xy);
+        el("s-batt").innerHTML = `<path d="${dd} L200 40 L0 40Z" fill="var(--accent)" opacity=".1"/><path d="${dd}" fill="none" stroke="var(--accent)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>` +
+          `<title>${v.length} readings, one every ${upfmt(b.hist.every)}: ${(lo / 1000).toFixed(2)}–${(hi / 1000).toFixed(2)} V</title>`;
+      } else el("s-batt").innerHTML = "";
+    } else {
+      el("battsum").textContent = "";
+      el("batt").innerHTML = `<p class="muted">Not answering${b.error ? ` (${esc(b.error)})` : ""}: unplugged, or asleep for a low battery.</p>`;
+      el("s-batt").innerHTML = "";
+    }
+    el("d-batt").className = "dot " + (bl === "ok" ? "" : bl); }
+
   /* Internet (home box today; any box running netwatch) */
   el("internet").hidden = !inet;
   if(inet){
@@ -826,9 +899,17 @@ async function tick(){
       row("DNS", nw.dns === false ? "failing" : nw.dns ? "resolving" : "—", nw.dns === false ? "crit" : "") +
       row("Last 24 h", `${inet.loss_pct != null ? inet.loss_pct.toFixed(2) + "% loss" : "—"} · ${inet.outage_minutes ? inet.outage_minutes + " min out" : "no outages"}`, inet.outage_minutes ? "warn" : "") +
       row("Check-in round trip", mir.sync_ms != null ? (mir.sync_ms / 1000).toFixed(1) + " s" : "—", "", "SSH through both tunnels") +
-      ((inet.speeds || []).length ? `<h3 class="sub">Speed tests</h3>` + (inet.speeds || []).slice().reverse().slice(0, 5).map(s => row(
-        new Date(s.t * 1000).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"}),
-        s.error ? "failed" : `${s.down.toFixed(0)} / ${s.up.toFixed(1)} · ${s.ping.toFixed(0)} ms`, s.error ? "crit" : slow(s) ? "warn" : "")).join("") : "");
+      ((inet.log || inet.speeds || []).length ? `<details class="ifaces" id="speedlog"${speedLogOpen ? " open" : ""}><summary>Speed test log · ${(inet.log || inet.speeds).length}</summary>` +
+        (inet.log || inet.speeds).slice().reverse().map(s => row(
+        new Date(s.t * 1000).toLocaleString([], {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"}),
+        s.error ? "failed" : `${s.down.toFixed(0)} / ${s.up.toFixed(1)} · ${s.ping < 10000 ? s.ping.toFixed(0) + " ms" : "ping failed"}`, s.error ? "crit" : slow(s) ? "warn" : "",
+        s.error ? "" : esc(s.where || ""))).join("") + `</details>` : "");
+    const sl = el("speedlog"); if(sl) sl.ontoggle = () => { speedLogOpen = sl.open; };
+    if(speedSince && lastSp && lastSp.t * 1000 >= speedSince - 5000){
+      speedSince = 0;
+      actmsg(lastSp.error ? "speed test failed" : `speed test — ${lastSp.down.toFixed(0)} down / ${lastSp.up.toFixed(1)} up Mb/s · ${lastSp.where}`, lastSp.error ? "crit" : "good");
+    }
+    speedBtn();
     let il = "ok";
     if(mine && mine.error) il = worst([il, note("warn", "Internet", `the mirror test to ${h.peer ? h.peer.host : "the other box"} failed`)]);
     const ext = ["cloudflare", "google"].map(k => nw[k]).filter(Boolean);

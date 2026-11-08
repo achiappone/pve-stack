@@ -238,7 +238,8 @@ def internet():
     """Reachability now and over the last day, and the recent speed tests.
     The netwatch timers write the data; this only summarises it."""
     pings = _jsonl("pings.jsonl", 1440)
-    speeds = _jsonl("speeds.jsonl", 14)
+    log = _jsonl("speeds.jsonl", 60)  # the dashboard's speed test log; the file itself keeps every test
+    speeds = log[-14:]
     mirror = _jsonl("mirror.jsonl", 400)
     if not pings and not speeds and not mirror:
         return None
@@ -256,7 +257,7 @@ def internet():
             "last_outage": outages[-1] if outages else None,
             "loss_pct": round(loss, 2) if loss is not None else None,
             "rtt_avg": round(sum(rtts) / len(rtts), 1) if rtts else None,
-            "speeds": speeds[-8:], "typical_down": med([s["down"] for s in ok]),
+            "speeds": speeds[-8:], "log": log, "typical_down": med([s["down"] for s in ok]),
             "typical_up": med([s["up"] for s in ok]),
             "mirror": {"pushes": pushes[-6:],
                        "sync_ms": syncs[-1]["ms"] if syncs else None,

@@ -18,7 +18,7 @@ import json, os, re, socket, subprocess, sys, time
 D = os.environ.get("NETWATCH_DIR", "/var/lib/netwatch")
 EXTERNAL = [("cloudflare", "1.1.1.1"), ("google", "8.8.8.8")]
 KEEP_PINGS = 7 * 1440          # a week of minutes
-KEEP_SPEEDS = 120              # two months of twice-daily tests
+KEEP_SPEEDS = None             # every test, kept: ~150 bytes each, ~110 KB a year at two a day
 
 
 def ping(host):
@@ -78,20 +78,32 @@ def do_ping():
     append("pings.jsonl", rec, KEEP_PINGS, prune=time.localtime().tm_min == 0)
 
 
+# Pinned per box, its own ISP first (IDs from speedtest-cli --list, 2026-11-08): left to
+# itself, speedtest-cli 2.1.3's latency probe often fails (ping 1800000) and it lands on
+# a far server - Brazil, Ohio, Butler PA - reading 40-75 Mb/s on ~300 Mb/s lines.
+# 1771 Comcast Jacksonville, 68862 AT&T Orlando, 12840 832 Communications Orlando.
+SPEED_SERVERS = {"promox": ["1771", "68862", "12840"],       # home: Comcast
+                 "pve-code1": ["68862", "12840", "1771"],    # office: AT&T Business
+                 }.get(socket.gethostname(), [])
+
+
 def do_speed():
     rec = {"t": int(time.time())}
     r = None
     try:
-        r = subprocess.run(["speedtest-cli", "--json", "--secure"],
-                           capture_output=True, text=True, timeout=240)
+        for pin in (SPEED_SERVERS, []):  # pinned first; any server if all three are down
+            r = subprocess.run(["speedtest-cli", "--json", "--secure"] + [a for s in pin for a in ("--server", s)],
+                               capture_output=True, text=True, timeout=240)
+            if r.returncode == 0:
+                break
         d = json.loads(r.stdout)
         rec.update({"down": round(d["download"] / 1e6, 1), "up": round(d["upload"] / 1e6, 1),
-                    "ping": round(d["ping"], 1), "server": d["server"]["sponsor"],
+                    "ping": round(d["ping"], 1), "server": d["server"]["sponsor"], "id": d["server"]["id"],
                     "where": d["server"]["name"], "isp": d["client"]["isp"],
                     "mb": round((d["bytes_received"] + d["bytes_sent"]) / 1e6)})
     except Exception as e:
         rec["error"] = ((r.stderr or "").strip()[-200:] if r else "") or str(e)[:200]
-    append("speeds.jsonl", rec, KEEP_SPEEDS, prune=True)
+    append("speeds.jsonl", rec, KEEP_SPEEDS, prune=False)  # the speed test log: never pruned
 
 
 PROBE_MB = 16
