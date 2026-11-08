@@ -405,7 +405,6 @@ const battPct = mv => { if(mv <= BATT_CURVE[0]) return 0;
   for(let i = 1; i < 11; i++) if(mv < BATT_CURVE[i]) return Math.floor((i - 1) * 10 + (mv - BATT_CURVE[i - 1]) * 10 / (BATT_CURVE[i] - BATT_CURVE[i - 1]));
   return 100; };
 console.assert(battPct(3300) === 0 && battPct(3790) === 50 && battPct(3805) === 55 && battPct(4250) === 100, "battPct self-check failed");
-const battSeen = [];  // [ms, mV] over the last minute, this tab only: the charge trend
 
 /* ---------------- traffic rates ---------------- */
 let prevLinks = null, prevT = 0;
@@ -859,14 +858,15 @@ async function tick(){
   { const b = d.huzzah || {};
     let bl = "off";
     if(b.mv){
-      battSeen.push([Date.now(), b.mv]); while(battSeen[0][0] < Date.now() - 70000) battSeen.shift();
-      const was = battSeen[0][1], trend = Date.now() - battSeen[0][0] > 50000 ? (b.mv >= was + 10) - (b.mv + 10 <= was) : 0;
-      const pct = battPct(b.mv), state = b.mv >= 4180 ? "Full / top-off" : trend > 0 ? "Charging" : trend < 0 ? "On battery" : "Steady";
+      // The board works out plugged-in, the level (counted while charging) and the estimate itself (usb, pct, est_s).
+      const usb = !!b.usb, pct = b.pct ?? battPct(b.mv), est = b.est_s ?? -1;
+      const state = !usb ? "On battery" : est === 0 ? "Full" : b.mv >= 4180 ? "Topping off" : "Charging";
       bl = b.mv < 3500 ? note("warn", "HUZZAH battery", `battery low, ${(b.mv / 1000).toFixed(2)} V`) : "ok";
       el("battsum").textContent = state;
       el("batt").innerHTML =
-        `<div class="big2"><div><small>Charge</small><b>${trend > 0 ? "~" : ""}${pct}%</b><small>${trend > 0 ? "reads high while charging" : "from the LiPo curve"}</small></div>` +
-        `<div><small>Voltage</small><b>${(b.mv / 1000).toFixed(3)} V</b><small>${b.mah} mAh cell</small></div></div>` +
+        `<div class="big2"><div><small>Charge</small><b>${usb && pct < 100 ? "~" : ""}${pct}%</b><small>${usb ? "counted while charging" : "from the LiPo curve"}</small></div>` +
+        `<div><small>${usb ? "Time to full" : "Time left"}</small><b>${est === 0 ? "Full" : est < 0 ? "—" : "~" + upfmt(est)}</b><small>${usb ? "at 200 mA, then the top-off" : "at the board's usual draw"}</small></div></div>` +
+        row("Voltage", `${(b.mv / 1000).toFixed(3)} V`, "", `${b.mah} mAh cell`) +
         row("WiFi", b.wifi ? `${b.rssi} dBm` : "down") + row("Up", upfmt(b.uptime || 0)) +
         row("Top-off", b.topoff ? `${b.topoff} min at 4.2 V` : "not timed yet") +
         row("Board", `<a href="${esc(BATT_URL)}" target="_blank" rel="noopener">its own page</a>`, "", "LAN only");
