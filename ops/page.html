@@ -705,7 +705,11 @@ async function tick(){
   const byId = Object.fromEntries(lxc.map(c => [String(c.vmid), c]));
   const svcs = d.services || [], probes = d.probes || {};
   let saved = []; try{ saved = JSON.parse(localStorage.svcOrder || "[]"); }catch(e){}
-  const rank = sv => { const i = saved.indexOf(sv.name); return i < 0 ? saved.length : i; };
+  // A service missing from the saved order (added after you last dragged) goes right after its neighbour
+  // in the server's list, not to the bottom.
+  const order = saved.filter(n => svcs.some(s => s.name === n));
+  svcs.forEach((s, k) => { if (!order.includes(s.name)) { const prev = k ? order.indexOf(svcs[k - 1].name) : -1; order.splice(prev + 1, 0, s.name); } });
+  const rank = sv => order.indexOf(sv.name);
   const probed = svcs.filter(s => probes[s.url] && !s.optional), svcDown = probed.filter(s => !probes[s.url].up);
   const offOpt = svcs.filter(s => s.optional && probes[s.url] && !probes[s.url].up);
   const svcIds = new Set();
