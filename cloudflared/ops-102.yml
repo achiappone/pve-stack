@@ -36,4 +36,8 @@ ingress:
   # app login (K2-style shared user/password, no Access) is the only auth layer.
   - hostname: lighting.pdlights.dev
     service: http://10.10.10.6:80
+  # ILS Command 2 web emulator + ILS fixture simulator (CT 107, repo ils-sim). HTTP basic auth in the app
+  # (/etc/ils-sim.conf in CT 107), no Access, same as lighting.* above.
+  - hostname: ils.pdlights.dev
+    service: http://10.10.10.7:8800
   - service: http_status:404

@@ -22,6 +22,10 @@ const SERVICES: ServiceEntry[] = [
   // tunnel is the way in and its Access policy is the auth for every user.
   { ct: 106, name: "PD Lighting", url: "https://lighting.pdlights.dev",
     desc: "lighting control app - GitHub Actions deploys on push to main" },
+  // ILS Command 2 console emulator + ILS fixture simulator (repo ils-sim, deploy/deploy.sh from a Mac).
+  // App login (basic auth, /etc/ils-sim.conf in the CT), no Access.
+  { ct: 107, name: "ILS Command 2 emulator", url: "https://ils.pdlights.dev",
+    desc: "console in the browser + ILS fixture simulator" },
   { ct: 100, name: "Nginx Proxy Manager", url: "http://10.20.1.46:81",
     desc: "unused", lan: true, optional: true },
   { ct: null, name: "Proxmox VE", url: "https://pve.anthonychiappone.com",
